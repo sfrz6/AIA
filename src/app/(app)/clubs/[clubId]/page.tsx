@@ -46,6 +46,7 @@ export default async function ClubPage({
         riders={riders.map((rider) => ({
           id: rider.id,
           fullName: rider.fullName,
+          fullNameAr: rider.fullNameAr,
           isActive: rider.isActive,
         }))}
         includeRetired={includeRetired}

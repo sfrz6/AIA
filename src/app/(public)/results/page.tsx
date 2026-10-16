@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Trophy, Users } from "lucide-react";
-import { championshipDisplayName, formatCompetitionDate } from "@/components/common/formatting";
+import {
+  championshipDisplayName,
+  formatCompetitionDate,
+  localizedText,
+} from "@/components/common/formatting";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, PageHeader } from "@/components/ui/surfaces";
 import { getTranslator } from "@/lib/i18n/server";
@@ -16,7 +20,7 @@ import { AutoRefresh } from "./auto-refresh";
 export const metadata: Metadata = {
   title: "Official results",
   description:
-    "Published championship results of the International Tent Pegging Federation.",
+    "Published championship results of Assayel International Academy.",
   robots: { index: true, follow: true },
 };
 
@@ -54,16 +58,18 @@ export default async function PublicResultsIndexPage() {
                     {championshipDisplayName(championship.name, championship.nameAr, locale)}
                   </CardTitle>
                   {/*
-                    Location is an untranslated proper noun. In Arabic, left
-                    as plain text it can be torn apart mid-phrase by the
-                    browser's bidi reordering when the line wraps; `bdi`
-                    isolates it as one atomic run so it wraps as a whole
-                    without disturbing the date's own (already correct)
-                    right-to-left flow.
+                    A location with no Arabic override is an untranslated
+                    proper noun. Left as plain text it can be torn apart
+                    mid-phrase by the browser's bidi reordering when the line
+                    wraps; `bdi` isolates it as one atomic run so it wraps as
+                    a whole without disturbing the date's own (already
+                    correct) right-to-left flow.
                   */}
                   <p className="text-sm text-muted">
                     {formatCompetitionDate(championship.startDate, locale)} ·{" "}
-                    <bdi>{championship.location}</bdi>
+                    <bdi>
+                      {localizedText(championship.location, championship.locationAr, locale)}
+                    </bdi>
                   </p>
                 </CardHeader>
                 <CardContent className="mt-auto space-y-3">

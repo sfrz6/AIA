@@ -64,7 +64,9 @@ suite("championship club order and optional squads", () => {
         nameAr: null,
         startDate: "2026-09-18",
         location: "Amman",
+        locationAr: null,
         organizer: null,
+        organizerAr: null,
         squads: [pakistan, oman, jordan],
       }),
     );
@@ -94,7 +96,9 @@ suite("championship club order and optional squads", () => {
         nameAr: null,
         startDate: "2026-09-18",
         location: "Amman",
+        locationAr: null,
         organizer: null,
+        organizerAr: null,
         squads: [{ clubId: jordan, riders: [] }, oman],
       }),
     );
@@ -142,7 +146,9 @@ suite("championship club order and optional squads", () => {
         nameAr: null,
         startDate: "2026-09-18",
         location: "Amman",
+        locationAr: null,
         organizer: null,
+        organizerAr: null,
         squads: [{ clubId: jordan, riders: [] }, oman],
       }),
     );

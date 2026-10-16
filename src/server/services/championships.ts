@@ -20,7 +20,9 @@ export interface ChampionshipSummary {
   readonly slug: string;
   readonly startDate: string;
   readonly location: string;
+  readonly locationAr: string | null;
   readonly organizer: string | null;
+  readonly organizerAr: string | null;
   readonly status: "DRAFT" | "ACTIVE" | "COMPLETED";
   readonly isPublished: boolean;
   readonly clubCount: number;
@@ -70,7 +72,9 @@ export async function listChampionships(options: {
       slug: championships.slug,
       startDate: championships.startDate,
       location: championships.location,
+      locationAr: championships.locationAr,
       organizer: championships.organizer,
+      organizerAr: championships.organizerAr,
       status: championships.status,
       isPublished: championships.isPublished,
       clubCount: clubCountExpression,
@@ -124,7 +128,9 @@ export async function getChampionshipDetail(
       slug: championships.slug,
       startDate: championships.startDate,
       location: championships.location,
+      locationAr: championships.locationAr,
       organizer: championships.organizer,
+      organizerAr: championships.organizerAr,
       status: championships.status,
       isPublished: championships.isPublished,
       sourceTemplateName: championships.sourceTemplateName,
@@ -387,7 +393,9 @@ export async function getChampionshipBySlug(slug: string): Promise<ChampionshipS
       slug: championships.slug,
       startDate: championships.startDate,
       location: championships.location,
+      locationAr: championships.locationAr,
       organizer: championships.organizer,
+      organizerAr: championships.organizerAr,
       status: championships.status,
       isPublished: championships.isPublished,
       clubCount: clubCountExpression,

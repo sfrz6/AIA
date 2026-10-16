@@ -59,6 +59,7 @@ export default async function ParticipantsPage({
       registry: (registries[index] ?? []).map((rider) => ({
         id: rider.id,
         fullName: rider.fullName,
+        fullNameAr: rider.fullNameAr,
       })),
     };
   });

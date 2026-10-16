@@ -39,7 +39,9 @@ export interface CreateChampionshipInput {
   readonly nameAr: string | null;
   readonly startDate: string;
   readonly location: string;
+  readonly locationAr: string | null;
   readonly organizer: string | null;
+  readonly organizerAr: string | null;
   readonly squads: readonly SquadInput[];
 }
 
@@ -292,7 +294,9 @@ export async function createChampionshipFromTemplate(
       nameAr: input.nameAr,
       startDate: input.startDate,
       location: input.location,
+      locationAr: input.locationAr,
       organizer: input.organizer,
+      organizerAr: input.organizerAr,
       slug,
       status: "DRAFT",
       isPublished: false,
@@ -376,6 +380,8 @@ export async function createChampionshipFromTemplate(
       startDate: input.startDate,
       location: input.location,
       organizer: input.organizer,
+      locationAr: input.locationAr,
+      organizerAr: input.organizerAr,
       template: structure.name,
       clubs: input.squads.length,
     },

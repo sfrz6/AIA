@@ -185,7 +185,9 @@ export async function createChampionshipFixture(options: {
       nameAr: null,
       startDate: "2026-09-18",
       location: "Amman",
+      locationAr: null,
       organizer: "Royal Jordanian Equestrian Federation",
+      organizerAr: null,
       squads,
     }),
   );

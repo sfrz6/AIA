@@ -1,0 +1,1 @@
+ALTER TABLE "riders" ADD COLUMN "full_name_ar" text;

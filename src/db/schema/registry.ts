@@ -36,6 +36,8 @@ export const riders = pgTable(
       .notNull()
       .references(() => clubs.id, { onDelete: "restrict" }),
     fullName: text("full_name").notNull(),
+    /** Shown instead of `fullName` on an Arabic-locale page when set. */
+    fullNameAr: text("full_name_ar"),
     /** Retired riders stay in the registry but drop out of the pickers. */
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

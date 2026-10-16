@@ -18,17 +18,22 @@ export function formatCompetitionDate(isoDate: string, locale: Locale): string {
 }
 
 /**
- * A championship's Arabic name is optional, entered separately from the
- * English one (never translated automatically), so this only swaps to it on
- * an Arabic-locale page when one was actually set, falling back to the
- * English name otherwise.
+ * An Arabic override is optional, entered separately from the English value
+ * (never translated automatically), so this only swaps to it on an
+ * Arabic-locale page when one was actually set, falling back to the English
+ * value otherwise. Used for a championship's name, location and organizer.
  */
+export function localizedText(value: string, valueAr: string | null, locale: Locale): string {
+  return locale === "ar" && valueAr ? valueAr : value;
+}
+
+/** Alias of {@link localizedText} for call sites that read better as "display name". */
 export function championshipDisplayName(
   name: string,
   nameAr: string | null,
   locale: Locale,
 ): string {
-  return locale === "ar" && nameAr ? nameAr : name;
+  return localizedText(name, nameAr, locale);
 }
 
 export function formatDateTime(value: Date, locale: Locale): string {

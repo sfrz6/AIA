@@ -19,7 +19,9 @@ export interface ChampionshipSettingsData {
   readonly name: string;
   readonly nameAr: string | null;
   readonly location: string;
+  readonly locationAr: string | null;
   readonly organizer: string | null;
+  readonly organizerAr: string | null;
   readonly status: "DRAFT" | "ACTIVE" | "COMPLETED";
   readonly isPublished: boolean;
   readonly slug: string;
@@ -42,7 +44,9 @@ export function ChampionshipSettings({
     name: championship.name,
     nameAr: championship.nameAr ?? "",
     location: championship.location,
+    locationAr: championship.locationAr ?? "",
     organizer: championship.organizer ?? "",
+    organizerAr: championship.organizerAr ?? "",
     status: championship.status,
   });
 
@@ -54,7 +58,9 @@ export function ChampionshipSettings({
         name: form.name.trim(),
         nameAr: form.nameAr.trim() || null,
         location: form.location.trim(),
+        locationAr: form.locationAr.trim() || null,
         organizer: form.organizer.trim() || null,
+        organizerAr: form.organizerAr.trim() || null,
         status: form.status,
       });
       if (!result.ok) {
@@ -142,11 +148,29 @@ export function ChampionshipSettings({
                 required
               />
             </Field>
+            <Field label={t("championships.locationAr")} htmlFor="ch-location-ar">
+              <Input
+                id="ch-location-ar"
+                dir="rtl"
+                value={form.locationAr}
+                onChange={(event) => setForm({ ...form, locationAr: event.target.value })}
+                maxLength={160}
+              />
+            </Field>
             <Field label={t("championships.organizer")} htmlFor="ch-organizer">
               <Input
                 id="ch-organizer"
                 value={form.organizer}
                 onChange={(event) => setForm({ ...form, organizer: event.target.value })}
+                maxLength={160}
+              />
+            </Field>
+            <Field label={t("championships.organizerAr")} htmlFor="ch-organizer-ar">
+              <Input
+                id="ch-organizer-ar"
+                dir="rtl"
+                value={form.organizerAr}
+                onChange={(event) => setForm({ ...form, organizerAr: event.target.value })}
                 maxLength={160}
               />
             </Field>

@@ -33,16 +33,20 @@ export function AiaLogo({
   );
 }
 
-/** Logo for printed documents and other always-white surfaces. */
-export function AiaLogoPrint({ width = 96 }: { width?: number }) {
-  const height = Math.round((width * 1242) / 1270);
+/**
+ * Logo for printed documents and other always-white surfaces, sized by
+ * height so it lines up evenly next to `OmanFederationLogoPrint`, whose
+ * source image has a different aspect ratio.
+ */
+export function AiaLogoPrint({ height = 75 }: { height?: number }) {
+  const width = Math.round((height * 1270) / 1242);
   return (
     <Image
       src="/brand/aia-logo.png"
       alt="Assayel International Academy"
       width={1270}
       height={1242}
-      className="h-auto"
+      className="w-auto"
       style={{ width, height }}
       unoptimized
     />
@@ -51,17 +55,19 @@ export function AiaLogoPrint({ width = 96 }: { width?: number }) {
 
 /**
  * Oman Equestrian and Racing Federation mark, shown alongside the academy
- * logo on official printed documents (round sheets and standings).
+ * logo on official printed documents (round sheets and standings). Sized by
+ * height, same as `AiaLogoPrint`, so the two logos match in height rather
+ * than width despite their different aspect ratios.
  */
-export function OmanFederationLogoPrint({ width = 72 }: { width?: number }) {
-  const height = Math.round((width * 860) / 1144);
+export function OmanFederationLogoPrint({ height = 75 }: { height?: number }) {
+  const width = Math.round((height * 1144) / 860);
   return (
     <Image
       src="/brand/oman-federation-logo.png"
       alt="Oman Equestrian and Racing Federation"
       width={1144}
       height={860}
-      className="h-auto"
+      className="w-auto"
       style={{ width, height }}
       unoptimized
     />

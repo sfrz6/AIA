@@ -125,7 +125,7 @@ export function ParticipantsManager({
     // keep the current nomination visible and editable.
     for (const rider of club.squad) {
       if (!byId.has(rider.riderId)) {
-        byId.set(rider.riderId, { id: rider.riderId, fullName: rider.fullName });
+        byId.set(rider.riderId, { id: rider.riderId, fullName: rider.fullName, fullNameAr: null });
       }
     }
     for (const rider of extraRiders[club.clubId] ?? []) byId.set(rider.id, rider);

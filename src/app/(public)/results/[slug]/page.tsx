@@ -8,6 +8,7 @@ import {
   championshipDisplayName,
   formatCompetitionDate,
   formatPegSize,
+  localizedText,
 } from "@/components/common/formatting";
 import { eventLabel } from "@/components/common/labels";
 import { Badge, Callout, EmptyState } from "@/components/ui/surfaces";
@@ -40,9 +41,10 @@ export async function generateMetadata({
   const championship = await getChampionshipBySlug(slug);
   if (!championship) return { title: "Official results" };
   const name = championshipDisplayName(championship.name, championship.nameAr, locale);
+  const location = localizedText(championship.location, championship.locationAr, locale);
   return {
     title: `${name} results`,
-    description: `Official results of ${name}, ${championship.location}.`,
+    description: `Official results of ${name}, ${location}.`,
     robots: { index: true, follow: true },
   };
 }
@@ -103,18 +105,23 @@ export default async function PublicChampionshipResultsPage({
             {championshipDisplayName(championship.name, championship.nameAr, locale)}
           </h1>
           {/*
-            Location and organizer are untranslated proper nouns. In Arabic,
-            left as plain text either can be torn apart mid-phrase by the
-            browser's bidi reordering when the line wraps; `bdi` isolates each
-            as one atomic run so it wraps as a whole without disturbing the
-            date's own (already correct) right-to-left flow.
+            A location or organizer with no Arabic override is an
+            untranslated proper noun. In Arabic, left as plain text either can
+            be torn apart mid-phrase by the browser's bidi reordering when the
+            line wraps; `bdi` isolates each as one atomic run so it wraps as a
+            whole without disturbing the date's own (already correct)
+            right-to-left flow.
           */}
           <p className="text-sm text-muted">
-            {formatCompetitionDate(championship.startDate, locale)} · <bdi>{championship.location}</bdi>
+            {formatCompetitionDate(championship.startDate, locale)} ·{" "}
+            <bdi>{localizedText(championship.location, championship.locationAr, locale)}</bdi>
             {championship.organizer ? (
               <>
                 {" "}
-                · <bdi>{championship.organizer}</bdi>
+                ·{" "}
+                <bdi>
+                  {localizedText(championship.organizer, championship.organizerAr, locale)}
+                </bdi>
               </>
             ) : null}
           </p>

@@ -13,6 +13,7 @@ export interface ClubSummary {
 export interface RiderRecord {
   readonly id: string;
   readonly fullName: string;
+  readonly fullNameAr: string | null;
   readonly isActive: boolean;
   readonly clubId: string;
 }
@@ -111,6 +112,7 @@ export async function listRidersForClub(
     .select({
       id: riders.id,
       fullName: riders.fullName,
+      fullNameAr: riders.fullNameAr,
       isActive: riders.isActive,
       clubId: riders.clubId,
     })
@@ -133,18 +135,20 @@ export async function listRidersForClub(
  */
 export async function createRider(
   tx: Executor,
-  input: { clubId: string; fullName: string },
+  input: { clubId: string; fullName: string; fullNameAr: string | null },
 ): Promise<RiderRecord> {
   const fullName = input.fullName.trim().replace(/\s+/g, " ");
   if (!fullName) throw new DomainError("A rider name is required.", "VALIDATION");
+  const fullNameAr = input.fullNameAr?.trim().replace(/\s+/g, " ") || null;
 
   const inserted = await tx
     .insert(riders)
-    .values({ clubId: input.clubId, fullName })
+    .values({ clubId: input.clubId, fullName, fullNameAr })
     .onConflictDoNothing()
     .returning({
       id: riders.id,
       fullName: riders.fullName,
+      fullNameAr: riders.fullNameAr,
       isActive: riders.isActive,
       clubId: riders.clubId,
     });
@@ -156,6 +160,7 @@ export async function createRider(
     .select({
       id: riders.id,
       fullName: riders.fullName,
+      fullNameAr: riders.fullNameAr,
       isActive: riders.isActive,
       clubId: riders.clubId,
     })

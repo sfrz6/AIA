@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 import { getTranslator } from "@/lib/i18n/server";
-import { championshipDisplayName, formatCompetitionDate } from "@/components/common/formatting";
+import {
+  championshipDisplayName,
+  formatCompetitionDate,
+  localizedText,
+} from "@/components/common/formatting";
 import { AiaLogoPrint, OmanFederationLogoPrint } from "@/components/common/aia-logo";
 import { PrintTrigger } from "@/components/common/print-trigger";
 import { getChampionshipBySlug, getChampionshipDetail } from "@/server/services/championships";
@@ -65,7 +69,10 @@ export default async function PublicStandingsPdfPage({
 
       <header className="mb-4 flex items-start justify-between gap-6 border-b-2 border-black pb-3">
         <div className="flex items-start gap-4">
-          <AiaLogoPrint width={96} />
+          <div className="flex items-center gap-2">
+            <AiaLogoPrint height={75} />
+            <OmanFederationLogoPrint height={75} />
+          </div>
           <div>
             <p className="text-[10pt] font-semibold uppercase tracking-wide">
               {t("common.federation")}
@@ -74,13 +81,14 @@ export default async function PublicStandingsPdfPage({
               {championshipDisplayName(championship.name, championship.nameAr, locale)}
             </h1>
             <p className="text-[9pt]">
-              {championship.location}
-              {championship.organizer ? ` · ${championship.organizer}` : ""}
+              {localizedText(championship.location, championship.locationAr, locale)}
+              {championship.organizer
+                ? ` · ${localizedText(championship.organizer, championship.organizerAr, locale)}`
+                : ""}
             </p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 text-end text-[9pt]">
-          <OmanFederationLogoPrint width={64} />
+        <div className="text-end text-[9pt]">
           <p className="text-[11pt] font-bold">
             {t("publicResults.standingsPdfTitle")} — {t(scopeLabelKey(scope))}
           </p>

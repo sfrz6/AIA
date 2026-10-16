@@ -31,7 +31,11 @@ export const championships = pgTable(
     nameAr: text("name_ar"),
     startDate: date("start_date").notNull(),
     location: text("location").notNull(),
+    /** Shown instead of `location` on an Arabic-locale page when set. */
+    locationAr: text("location_ar"),
     organizer: text("organizer"),
+    /** Shown instead of `organizer` on an Arabic-locale page when set. */
+    organizerAr: text("organizer_ar"),
     status: championshipStatusEnum("status").notNull().default("DRAFT"),
     /** Controls whether the public results page shows this championship. */
     isPublished: boolean("is_published").notNull().default(false),

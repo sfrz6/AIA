@@ -19,16 +19,19 @@ const riderNameSchema = z
 const createSchema = z.object({
   clubId: z.uuid(),
   fullName: riderNameSchema,
+  fullNameAr: z.string().trim().max(120, "A rider name must be at most 120 characters.").nullable(),
 });
 
 export interface CreatedRider {
   readonly id: string;
   readonly fullName: string;
+  readonly fullNameAr: string | null;
 }
 
 export async function createRiderAction(input: {
   clubId: string;
   fullName: string;
+  fullNameAr: string | null;
 }): Promise<ActionResult<CreatedRider>> {
   return run(async () => {
     const actor = await requirePermission("MANAGE_RIDERS");
@@ -45,22 +48,27 @@ export async function createRiderAction(input: {
         action: "RIDER_CREATED",
         entityType: "rider",
         entityId: rider.id,
-        after: { clubId: rider.clubId, fullName: rider.fullName },
+        after: { clubId: rider.clubId, fullName: rider.fullName, fullNameAr: rider.fullNameAr },
       });
       return rider;
     });
 
     revalidatePath(`/clubs/${parsed.data.clubId}`);
     revalidatePath("/clubs");
-    return ok({ id: created.id, fullName: created.fullName });
+    return ok({ id: created.id, fullName: created.fullName, fullNameAr: created.fullNameAr });
   });
 }
 
-const renameSchema = z.object({ riderId: z.uuid(), fullName: riderNameSchema });
+const renameSchema = z.object({
+  riderId: z.uuid(),
+  fullName: riderNameSchema,
+  fullNameAr: z.string().trim().max(120, "A rider name must be at most 120 characters.").nullable(),
+});
 
 export async function renameRiderAction(input: {
   riderId: string;
   fullName: string;
+  fullNameAr: string | null;
 }): Promise<ActionResult<undefined>> {
   return run(async () => {
     const actor = await requirePermission("MANAGE_RIDERS");
@@ -70,10 +78,16 @@ export async function renameRiderAction(input: {
     }
 
     const fullName = parsed.data.fullName.replace(/\s+/g, " ");
+    const fullNameAr = parsed.data.fullNameAr?.replace(/\s+/g, " ") || null;
 
     const clubId = await getDb().transaction(async (tx) => {
       const [existing] = await tx
-        .select({ id: riders.id, fullName: riders.fullName, clubId: riders.clubId })
+        .select({
+          id: riders.id,
+          fullName: riders.fullName,
+          fullNameAr: riders.fullNameAr,
+          clubId: riders.clubId,
+        })
         .from(riders)
         .where(eq(riders.id, parsed.data.riderId))
         .limit(1);
@@ -100,15 +114,15 @@ export async function renameRiderAction(input: {
 
       await tx
         .update(riders)
-        .set({ fullName, updatedAt: new Date() })
+        .set({ fullName, fullNameAr, updatedAt: new Date() })
         .where(eq(riders.id, existing.id));
 
       await recordAudit(tx, actor, {
         action: "RIDER_UPDATED",
         entityType: "rider",
         entityId: existing.id,
-        before: { fullName: existing.fullName },
-        after: { fullName },
+        before: { fullName: existing.fullName, fullNameAr: existing.fullNameAr },
+        after: { fullName, fullNameAr },
       });
 
       return existing.clubId;

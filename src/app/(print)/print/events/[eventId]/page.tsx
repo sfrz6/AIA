@@ -5,7 +5,12 @@ import { getTranslator } from "@/lib/i18n/server";
 import { getEventTypeDefinition } from "@/domain/scoring/event-types";
 import { buildScoringUnits } from "@/domain/entry-order";
 import { getEventPrintState } from "@/server/services/runs";
-import { formatCompetitionDate, formatPegSize, formatTime } from "@/components/common/formatting";
+import {
+  formatCompetitionDate,
+  formatPegSize,
+  formatTime,
+  localizedText,
+} from "@/components/common/formatting";
 import { eventLabel } from "@/components/common/labels";
 import { targetLabels } from "@/components/common/target-labels";
 import { AiaLogoPrint, OmanFederationLogoPrint } from "@/components/common/aia-logo";
@@ -41,7 +46,10 @@ export default async function EventRoundSheetPage({
 
       <header className="mb-4 flex items-start justify-between gap-6 border-b-2 border-black pb-3">
         <div className="flex items-start gap-4">
-          <AiaLogoPrint width={96} />
+          <div className="flex items-center gap-2">
+            <AiaLogoPrint height={75} />
+            <OmanFederationLogoPrint height={75} />
+          </div>
           <div>
             <p className="text-[10pt] font-semibold uppercase tracking-wide">
               {t("common.federation")}
@@ -50,13 +58,14 @@ export default async function EventRoundSheetPage({
               {state.championshipName}
             </h1>
             <p className="text-[9pt]">
-              {state.championshipLocation}
-              {state.championshipOrganizer ? ` · ${state.championshipOrganizer}` : ""}
+              {localizedText(state.championshipLocation, state.championshipLocationAr, locale)}
+              {state.championshipOrganizer
+                ? ` · ${localizedText(state.championshipOrganizer, state.championshipOrganizerAr, locale)}`
+                : ""}
             </p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1 text-end text-[9pt]">
-          <OmanFederationLogoPrint width={64} />
+        <div className="text-end text-[9pt]">
           <p className="text-[11pt] font-bold">{t("print.roundSheet")}</p>
           <p>{t("championships.daysOf", { day: state.dayNumber })}</p>
           <p className="numeric">{formatCompetitionDate(state.competitionDate, locale)}</p>

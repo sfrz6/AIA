@@ -8,6 +8,7 @@ import { ok, run, type ActionResult } from "./result";
 export interface RiderOption {
   readonly id: string;
   readonly fullName: string;
+  readonly fullNameAr: string | null;
 }
 
 /**
@@ -22,6 +23,12 @@ export async function listClubRidersAction(
   return run(async () => {
     await requireUser();
     const riders = await listRidersForClub(clubId);
-    return ok(riders.map((rider) => ({ id: rider.id, fullName: rider.fullName })));
+    return ok(
+      riders.map((rider) => ({
+        id: rider.id,
+        fullName: rider.fullName,
+        fullNameAr: rider.fullNameAr,
+      })),
+    );
   });
 }

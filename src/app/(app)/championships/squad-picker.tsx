@@ -17,6 +17,7 @@ import { createRiderAction } from "@/server/actions/riders";
 export interface SquadRiderOption {
   readonly id: string;
   readonly fullName: string;
+  readonly fullNameAr: string | null;
 }
 
 export const RESERVE_SLOT = "RESERVE";
@@ -168,6 +169,7 @@ export function SquadPicker({
 }: SquadPickerProps) {
   const { t } = useI18n();
   const [newName, setNewName] = React.useState("");
+  const [newNameAr, setNewNameAr] = React.useState("");
   const [addError, setAddError] = React.useState<string | null>(null);
   const [pending, startTransition] = React.useTransition();
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -200,13 +202,22 @@ export function SquadPicker({
     if (!fullName) return;
     setAddError(null);
     startTransition(async () => {
-      const result = await createRiderAction({ clubId, fullName });
+      const result = await createRiderAction({
+        clubId,
+        fullName,
+        fullNameAr: newNameAr.trim() || null,
+      });
       if (!result.ok) {
         setAddError(result.error);
         return;
       }
       setNewName("");
-      onRiderAdded({ id: result.data.id, fullName: result.data.fullName });
+      setNewNameAr("");
+      onRiderAdded({
+        id: result.data.id,
+        fullName: result.data.fullName,
+        fullNameAr: result.data.fullNameAr,
+      });
       inputRef.current?.focus();
     });
   }
@@ -300,6 +311,21 @@ export function SquadPicker({
             maxLength={120}
             autoComplete="off"
             aria-invalid={addError ? true : undefined}
+          />
+        </Field>
+        <Field
+          label={t("championships.riderNameAr")}
+          htmlFor={`squad-new-rider-ar-${clubId}`}
+          hint={t("common.optional")}
+          className="min-w-0 flex-1"
+        >
+          <Input
+            id={`squad-new-rider-ar-${clubId}`}
+            dir="rtl"
+            value={newNameAr}
+            onChange={(event) => setNewNameAr(event.target.value)}
+            maxLength={120}
+            autoComplete="off"
           />
         </Field>
         <Button type="submit" variant="secondary" loading={pending} disabled={!newName.trim()}>

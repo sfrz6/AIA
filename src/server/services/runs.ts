@@ -309,7 +309,9 @@ export interface EventPrintState {
   readonly championshipId: string;
   readonly championshipName: string;
   readonly championshipLocation: string;
+  readonly championshipLocationAr: string | null;
   readonly championshipOrganizer: string | null;
+  readonly championshipOrganizerAr: string | null;
   readonly runs: readonly EventPrintRun[];
   readonly clubs: readonly RunClubEntryOrder[];
 }
@@ -340,7 +342,9 @@ export async function getEventPrintState(
       championshipId: championships.id,
       championshipName: championships.name,
       championshipLocation: championships.location,
+      championshipLocationAr: championships.locationAr,
       championshipOrganizer: championships.organizer,
+      championshipOrganizerAr: championships.organizerAr,
     })
     .from(championshipEvents)
     .innerJoin(championshipDays, eq(championshipDays.id, championshipEvents.championshipDayId))
@@ -372,7 +376,9 @@ export async function getEventPrintState(
     championshipId: eventRow.championshipId,
     championshipName: eventRow.championshipName,
     championshipLocation: eventRow.championshipLocation,
+    championshipLocationAr: eventRow.championshipLocationAr,
     championshipOrganizer: eventRow.championshipOrganizer,
+    championshipOrganizerAr: eventRow.championshipOrganizerAr,
     runs,
     clubs: firstRunState.clubs,
   };

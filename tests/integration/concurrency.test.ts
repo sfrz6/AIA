@@ -221,7 +221,9 @@ suite("concurrency and data integrity", () => {
           nameAr: null,
           startDate: "2026-09-18",
           location: "Amman",
+          locationAr: null,
           organizer: null,
+          organizerAr: null,
           squads: [
             {
               clubId: jordan,
@@ -246,7 +248,9 @@ suite("concurrency and data integrity", () => {
           nameAr: null,
           startDate: "2026-09-18",
           location: "Amman",
+          locationAr: null,
           organizer: null,
+          organizerAr: null,
           squads: [goodSquad(jordan, jordanRiders)],
         }),
       ),
@@ -261,7 +265,9 @@ suite("concurrency and data integrity", () => {
           nameAr: null,
           startDate: "2026-09-18",
           location: "Amman",
+          locationAr: null,
           organizer: null,
+          organizerAr: null,
           squads: [
             goodSquad(jordan, [...jordanRiders.slice(0, 4), omanRiders[0]!]),
             goodSquad(oman, omanRiders),
@@ -276,18 +282,18 @@ suite("concurrency and data integrity", () => {
     const { clubIdByName } = await import("../helpers/fixtures");
     const jordan = await clubIdByName("JO");
 
-    await db.transaction((tx) => createRider(tx, { clubId: jordan, fullName: "Sami Khalid" }));
+    await db.transaction((tx) => createRider(tx, { clubId: jordan, fullName: "Sami Khalid", fullNameAr: null }));
 
     await expect(
       db.transaction((tx) =>
-        createRider(tx, { clubId: jordan, fullName: "  sami   khalid  " }),
+        createRider(tx, { clubId: jordan, fullName: "  sami   khalid  ", fullNameAr: null }),
       ),
     ).rejects.toThrow(/already exists/i);
 
     // The same name under a different club is a different person.
     const oman = await clubIdByName("OM");
     const created = await db.transaction((tx) =>
-      createRider(tx, { clubId: oman, fullName: "Sami Khalid" }),
+      createRider(tx, { clubId: oman, fullName: "Sami Khalid", fullNameAr: null }),
     );
     expect(created.fullName).toBe("Sami Khalid");
   });

@@ -25,6 +25,7 @@ import {
 export interface RiderRow {
   readonly id: string;
   readonly fullName: string;
+  readonly fullNameAr: string | null;
   readonly isActive: boolean;
 }
 
@@ -40,10 +41,12 @@ export function RiderRegistry({
   const { t } = useI18n();
   const router = useRouter();
   const [newName, setNewName] = React.useState("");
+  const [newNameAr, setNewNameAr] = React.useState("");
   const [addError, setAddError] = React.useState<string | null>(null);
   const [pending, startTransition] = React.useTransition();
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editingName, setEditingName] = React.useState("");
+  const [editingNameAr, setEditingNameAr] = React.useState("");
   const [retireTarget, setRetireTarget] = React.useState<RiderRow | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -53,12 +56,17 @@ export function RiderRegistry({
     if (!fullName) return;
     setAddError(null);
     startTransition(async () => {
-      const result = await createRiderAction({ clubId, fullName });
+      const result = await createRiderAction({
+        clubId,
+        fullName,
+        fullNameAr: newNameAr.trim() || null,
+      });
       if (!result.ok) {
         setAddError(result.error);
         return;
       }
       setNewName("");
+      setNewNameAr("");
       toast.success(t("clubs.riderAdded"));
       inputRef.current?.focus();
       router.refresh();
@@ -69,7 +77,11 @@ export function RiderRegistry({
     const fullName = editingName.trim();
     if (!fullName) return;
     startTransition(async () => {
-      const result = await renameRiderAction({ riderId, fullName });
+      const result = await renameRiderAction({
+        riderId,
+        fullName,
+        fullNameAr: editingNameAr.trim() || null,
+      });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -120,6 +132,21 @@ export function RiderRegistry({
                 aria-invalid={addError ? true : undefined}
               />
             </Field>
+            <Field
+              label={t("clubs.riderNameAr")}
+              htmlFor="new-rider-name-ar"
+              hint={t("common.optional")}
+              className="min-w-0 flex-1"
+            >
+              <Input
+                id="new-rider-name-ar"
+                dir="rtl"
+                value={newNameAr}
+                onChange={(event) => setNewNameAr(event.target.value)}
+                maxLength={120}
+                autoComplete="off"
+              />
+            </Field>
             <Button type="submit" loading={pending} disabled={!newName.trim()}>
               <Plus aria-hidden />
               {t("common.add")}
@@ -167,6 +194,18 @@ export function RiderRegistry({
                       className="h-8 flex-1"
                       aria-label={t("clubs.riderName")}
                     />
+                    <Input
+                      dir="rtl"
+                      value={editingNameAr}
+                      onChange={(event) => setEditingNameAr(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") saveRename(rider.id);
+                        if (event.key === "Escape") setEditingId(null);
+                      }}
+                      maxLength={120}
+                      className="h-8 flex-1"
+                      aria-label={t("clubs.riderNameAr")}
+                    />
                     <Button
                       size="iconSm"
                       variant="ghost"
@@ -189,6 +228,11 @@ export function RiderRegistry({
                   <>
                     <span className="min-w-0 flex-1 truncate text-sm">
                       {rider.fullName}
+                      {rider.fullNameAr ? (
+                        <span className="ms-2 text-muted" dir="rtl">
+                          {rider.fullNameAr}
+                        </span>
+                      ) : null}
                       {!rider.isActive ? (
                         <Badge tone="neutral" className="ms-2">
                           {t("clubs.retired")}
@@ -201,6 +245,7 @@ export function RiderRegistry({
                       onClick={() => {
                         setEditingId(rider.id);
                         setEditingName(rider.fullName);
+                        setEditingNameAr(rider.fullNameAr ?? "");
                       }}
                       aria-label={`${t("common.edit")}: ${rider.fullName}`}
                     >
