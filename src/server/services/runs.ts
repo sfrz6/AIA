@@ -110,16 +110,26 @@ export interface RunEntryOrderState {
   readonly allConfirmed: boolean;
 }
 
+/**
+ * `locale` is optional: callers that only use the roster for validation
+ * (never shown to anyone) skip it and get the plain English name, which is
+ * cheaper and avoids an unnecessary dependency on the caller's locale.
+ */
 async function loadRoster(
   tx: Executor,
   championshipId: string,
+  locale?: Locale,
 ): Promise<Map<string, RunRosterRider[]>> {
+  const fullName =
+    locale === "ar"
+      ? sql<string>`coalesce(${riders.fullNameAr}, ${riders.fullName})`
+      : riders.fullName;
   const rows = await tx
     .select({
       championshipClubId: championshipRiders.championshipClubId,
       championshipRiderId: championshipRiders.id,
       riderId: riders.id,
-      fullName: riders.fullName,
+      fullName,
       rosterSlot: championshipRiders.rosterSlot,
       initialOrder: championshipRiders.initialOrder,
     })
@@ -241,7 +251,7 @@ export async function getRunEntryOrderState(
     .orderBy(asc(championshipClubs.orderIndex));
 
   const [rosterByClub, previousOrders, confirmed] = await Promise.all([
-    loadRoster(db, run.championshipId),
+    loadRoster(db, run.championshipId, locale),
     loadPreviousOrders(db, run),
     db
       .select({
@@ -828,6 +838,8 @@ export async function getRunScoringState(
 
   const clubName =
     locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
+  const riderName =
+    locale === "ar" ? sql<string>`coalesce(${riders.fullNameAr}, ${riders.fullName})` : riders.fullName;
 
   const rows = await db
     .select({
@@ -839,7 +851,7 @@ export async function getRunScoringState(
       runScoreId: runScores.id,
       championshipRiderId: runScores.championshipRiderId,
       positionInUnit: runScores.positionInUnit,
-      riderName: riders.fullName,
+      riderName,
       targetIndex: runScoreTargets.targetIndex,
       points: runScoreTargets.points,
     })

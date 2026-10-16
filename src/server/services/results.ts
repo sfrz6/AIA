@@ -268,11 +268,13 @@ export async function loadParticipantDirectory(
   const db = getDb();
   const clubName =
     locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
+  const riderName =
+    locale === "ar" ? sql<string>`coalesce(${riders.fullNameAr}, ${riders.fullName})` : riders.fullName;
 
   const rows = await db
     .select({
       championshipRiderId: championshipRiders.id,
-      riderName: riders.fullName,
+      riderName,
       rosterSlot: championshipRiders.rosterSlot,
       championshipClubId: championshipClubs.id,
       clubName,

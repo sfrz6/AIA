@@ -270,11 +270,13 @@ export async function listChampionshipRiders(
   const db = getDb();
   const clubName =
     locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
+  const riderName =
+    locale === "ar" ? sql<string>`coalesce(${riders.fullNameAr}, ${riders.fullName})` : riders.fullName;
   return db
     .select({
       championshipRiderId: championshipRiders.id,
       riderId: riders.id,
-      fullName: riders.fullName,
+      fullName: riderName,
       rosterSlot: championshipRiders.rosterSlot,
       initialOrder: championshipRiders.initialOrder,
       championshipClubId: championshipClubs.id,
