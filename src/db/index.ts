@@ -30,7 +30,13 @@ export function createDatabase(connectionString: string) {
     if (typeof WebSocket === "undefined") {
       neonConfig.webSocketConstructor = ws;
     }
-    return drizzleNeon({ client: new NeonPool({ connectionString }), schema });
+    // Capped low: each serverless function instance caches its own pool on
+    // `globalThis`, and Vercel can spin up many instances concurrently under
+    // a burst of cold starts, so an uncapped pool here risks piling up more
+    // connections than Neon's plan allows. A handful per instance is plenty
+    // for this app's traffic (competition staff and the public results page,
+    // not a high-throughput API).
+    return drizzleNeon({ client: new NeonPool({ connectionString, max: 5 }), schema });
   }
   return drizzleNode({ client: new NodePool({ connectionString, max: 5 }), schema });
 }
