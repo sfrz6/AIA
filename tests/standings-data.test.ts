@@ -30,12 +30,7 @@ function clubTotals(dayOneTotal: number, hasDayTwo: boolean): ClubTotals {
 }
 
 function directoryOf(clubIds: readonly string[]): ChampionshipParticipantDirectory {
-  const clubs = new Map(
-    clubIds.map((id) => [
-      id,
-      { championshipClubId: id, iso2: id.slice(0, 2).toUpperCase(), iso3: "XXX", clubName: id },
-    ]),
-  );
+  const clubs = new Map(clubIds.map((id) => [id, { championshipClubId: id, clubName: id }]));
   return { riders: new Map(), clubs };
 }
 
@@ -153,6 +148,62 @@ describe("buildStandingsData — cross-scope tie-break reuse", () => {
     const overallB = overallClubs.rows.find((row) => row.key === "b")!;
     expect(overallA.rank).toBe(1);
     expect(overallB.rank).toBe(2);
+  });
+
+  it("reuses a single round that resolved two separate tied groups of Day 1 at once, for both groups", () => {
+    // An operator can record one tie-break round covering every tie of the
+    // day in one sitting: here club "a" and "b" (tied at 100) and "c" and
+    // "d" (tied at 60) were all drawn together. Reuse for Overall must
+    // recognise each of those two groups independently, not require the
+    // round's whole entry list to match a single group's exact key set.
+    const totals: ChampionshipTotals = {
+      riders: new Map(),
+      clubs: new Map([
+        ["a", { ...clubTotals(100, false), championshipClubId: "a" }],
+        ["b", { ...clubTotals(100, false), championshipClubId: "b" }],
+        ["c", { ...clubTotals(60, false), championshipClubId: "c" }],
+        ["d", { ...clubTotals(60, false), championshipClubId: "d" }],
+      ]),
+      runResults: new Map(),
+      daysWithResults: [1],
+    };
+
+    const tieBreaks = new Map<TieBreakKey, StoredTieBreakRound>([
+      [
+        "DAY_1:CLUB",
+        {
+          id: "round-1",
+          scope: "DAY_1",
+          subject: "CLUB",
+          pegSizeCm: "4",
+          timeLimitSeconds: 10,
+          maxPoints: 6,
+          entries: [
+            { key: "a", points: 6, timeSeconds: 8 },
+            { key: "b", points: 4, timeSeconds: 8 },
+            { key: "c", points: 6, timeSeconds: 7 },
+            { key: "d", points: 2, timeSeconds: 7 },
+          ],
+        },
+      ],
+    ]);
+
+    const results: ChampionshipResults = {
+      totals,
+      directory: directoryOf(["a", "b", "c", "d"]),
+      tieBreaks,
+      confirmedRunCount: 1,
+    };
+
+    const { sets } = buildStandingsData(results, t);
+    const overallClubs = sets.find((set) => set.scope === "OVERALL" && set.subject === "CLUB")!;
+
+    expect(overallClubs.hasUnresolvedTie).toBe(false);
+    const rankOf = (key: string) => overallClubs.rows.find((row) => row.key === key)!.rank;
+    expect(rankOf("a")).toBe(1);
+    expect(rankOf("b")).toBe(2);
+    expect(rankOf("c")).toBe(3);
+    expect(rankOf("d")).toBe(4);
   });
 });
 

@@ -251,6 +251,15 @@ function keysEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  * tie-break also settle Overall while Day 1 is the only day played (the two
  * totals are identical), without ever misapplying an old decision to a
  * later, merely similar-looking tie once more days change the total.
+ *
+ * A single round can cover more than one of its own scope's tied groups at
+ * once (an operator resolving every tie of the day in one sitting), so its
+ * entries are not one group's exact key set — they are the union of
+ * however many groups it was recorded for. Reuse therefore looks at every
+ * one of the source scope's tied groups that the round fully covers (every
+ * member of that group has an entry in the round), not at the round's
+ * entries as a single block, so each group the round resolved is still
+ * found and reused independently.
  */
 function findApplicableTieBreak(
   scope: StandingsScope,
@@ -265,13 +274,15 @@ function findApplicableTieBreak(
   for (const round of tieBreaks.values()) {
     if (round.subject !== subject || round.scope === scope) continue;
     const roundKeys = new Set(round.entries.map((entry) => entry.key));
-    const sourceGroup = tiedGroupsOf(rawByScope.get(round.scope) ?? []).find((candidate) =>
-      keysEqual(candidate.keys, roundKeys),
+    const sourceGroups = tiedGroupsOf(rawByScope.get(round.scope) ?? []).filter((candidate) =>
+      [...candidate.keys].every((key) => roundKeys.has(key)),
     );
-    if (!sourceGroup) continue;
-    if (groups.some((group) => sourceGroup.total.equals(group.total) && keysEqual(sourceGroup.keys, group.keys))) {
-      return round;
-    }
+    const applies = sourceGroups.some((sourceGroup) =>
+      groups.some(
+        (group) => sourceGroup.total.equals(group.total) && keysEqual(sourceGroup.keys, group.keys),
+      ),
+    );
+    if (applies) return round;
   }
 
   return undefined;
