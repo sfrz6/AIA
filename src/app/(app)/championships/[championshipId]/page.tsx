@@ -55,7 +55,14 @@ export default async function ChampionshipSchedulePage({
             <Card key={day.id}>
               <CardHeader>
                 <div>
-                  <CardTitle>{t("championships.daysOf", { day: day.dayNumber })}</CardTitle>
+                  <CardTitle>
+                    {championship.days.length > 1
+                      ? t("championships.daysOf", {
+                          day: day.dayNumber,
+                          total: championship.days.length,
+                        })
+                      : t("results.dayResults", { day: day.dayNumber })}
+                  </CardTitle>
                   <p className="mt-0.5 text-xs text-muted">
                     {formatCompetitionDate(day.competitionDate, locale)}
                   </p>

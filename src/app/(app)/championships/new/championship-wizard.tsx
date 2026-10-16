@@ -378,7 +378,9 @@ export function ChampionshipWizard({
             <CardTitle>{t("championships.stepDetails")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Callout tone="info">{t("championships.detailsHint")}</Callout>
+            <Callout tone="info">
+              {t("championships.detailsHint", { count: templateActiveDayCount })}
+            </Callout>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label={t("championships.championshipName")}

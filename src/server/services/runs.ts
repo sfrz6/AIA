@@ -322,6 +322,7 @@ export interface EventPrintState {
   readonly championshipLocationAr: string | null;
   readonly championshipOrganizer: string | null;
   readonly championshipOrganizerAr: string | null;
+  readonly totalDays: number;
   readonly runs: readonly EventPrintRun[];
   readonly clubs: readonly RunClubEntryOrder[];
 }
@@ -355,6 +356,14 @@ export async function getEventPrintState(
       championshipLocationAr: championships.locationAr,
       championshipOrganizer: championships.organizer,
       championshipOrganizerAr: championships.organizerAr,
+      // Written with a literal alias: an interpolated column inside a `sql`
+      // template renders as a bare name, which would bind to this subquery's
+      // own table rather than correlate to the outer championship row.
+      totalDays: sql<number>`(
+        select count(*)::int
+        from championship_days cd
+        where cd.championship_id = championships.id
+      )`,
     })
     .from(championshipEvents)
     .innerJoin(championshipDays, eq(championshipDays.id, championshipEvents.championshipDayId))
@@ -389,6 +398,7 @@ export async function getEventPrintState(
     championshipLocationAr: eventRow.championshipLocationAr,
     championshipOrganizer: eventRow.championshipOrganizer,
     championshipOrganizerAr: eventRow.championshipOrganizerAr,
+    totalDays: eventRow.totalDays,
     runs,
     clubs: firstRunState.clubs,
   };

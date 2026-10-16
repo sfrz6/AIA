@@ -67,7 +67,11 @@ export default async function EventRoundSheetPage({
         </div>
         <div className="text-end text-[9pt]">
           <p className="text-[11pt] font-bold">{t("print.roundSheet")}</p>
-          <p>{t("championships.daysOf", { day: state.dayNumber })}</p>
+          <p>
+            {state.totalDays > 1
+              ? t("championships.daysOf", { day: state.dayNumber, total: state.totalDays })
+              : t("results.dayResults", { day: state.dayNumber })}
+          </p>
           <p className="numeric">{formatCompetitionDate(state.competitionDate, locale)}</p>
         </div>
       </header>

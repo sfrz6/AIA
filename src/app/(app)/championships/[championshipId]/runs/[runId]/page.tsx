@@ -36,6 +36,7 @@ export default async function RunPage({
     loadConfirmedRuns(championshipId),
   ]);
 
+  const totalDays = Math.max(1, ...runsInOrder.map((entry) => entry.dayNumber));
   const index = runsInOrder.findIndex((entry) => entry.id === runId);
   const previousRun = index > 0 ? runsInOrder[index - 1] : undefined;
   const nextRun = index >= 0 && index < runsInOrder.length - 1 ? runsInOrder[index + 1] : undefined;
@@ -77,7 +78,10 @@ export default async function RunPage({
           {eventLabel(run.eventType, t)} · {t("templates.runNumber", { number: run.runNumber })}
         </h2>
         <p className="text-sm text-muted">
-          {t("championships.daysOf", { day: run.dayNumber })} ·{" "}
+          {totalDays > 1
+            ? t("championships.daysOf", { day: run.dayNumber, total: totalDays })
+            : t("results.dayResults", { day: run.dayNumber })}{" "}
+          ·{" "}
           {formatCompetitionDate(run.competitionDate, locale)}
         </p>
       </div>
