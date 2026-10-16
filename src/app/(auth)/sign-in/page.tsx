@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { currentPrincipalOrNull } from "@/lib/auth/authorize";
 import { getTranslator } from "@/lib/i18n/server";
-import { ItpfLogo } from "@/components/common/itpf-logo";
+import { AiaLogo } from "@/components/common/aia-logo";
 import { LocaleSwitcher, ThemeToggle } from "@/components/layout/toolbar";
 import { SignInForm } from "./sign-in-form";
 
@@ -22,7 +22,7 @@ export default async function SignInPage() {
       <div className="flex flex-1 items-center justify-center px-4 pb-16">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex flex-col items-center gap-3 text-center">
-            <ItpfLogo width={150} priority />
+            <AiaLogo width={150} priority />
             <div>
               <h1 className="text-lg font-semibold tracking-tight">{t("common.appName")}</h1>
               <p className="mt-1 text-sm text-muted">{t("auth.signInSubtitle")}</p>

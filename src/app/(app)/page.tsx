@@ -50,7 +50,7 @@ function ChampionshipCard({
         </span>
         <span className="block text-xs text-muted">
           {formatCompetitionDate(championship.startDate, locale)} · {championship.location} ·{" "}
-          {t("championships.eventsCount", { count: championship.countryCount })}
+          {t("championships.eventsCount", { count: championship.clubCount })}
         </span>
       </span>
       <span className="numeric hidden shrink-0 text-xs text-muted sm:block">

@@ -27,7 +27,7 @@ import type { ChampionshipDayDetail } from "@/server/services/championships";
  */
 
 const ALL_SCOPES: readonly StandingsScope[] = ["DAY_1", "DAY_2", "DAY_3", "OVERALL"];
-const ALL_SUBJECTS: readonly StandingsSubject[] = ["INDIVIDUAL", "COUNTRY"];
+const ALL_SUBJECTS: readonly StandingsSubject[] = ["INDIVIDUAL", "CLUB"];
 
 /** Parses a scope from a URL segment, rejecting anything that isn't exactly one of the four. */
 export function parseStandingsScope(value: string): StandingsScope | null {
@@ -91,21 +91,20 @@ export interface StandingDayValue {
 }
 
 export interface StandingRow {
-  /** Championship rider id for an individual row, championship country id for a country row. */
+  /** Championship rider id for an individual row, championship club id for a club row. */
   readonly key: string;
   readonly rank: number;
   /** Rank from the totals alone, which also groups the members of a tie. */
   readonly baseRank: number;
   readonly isTiedAfterTieBreak: boolean;
-  /** Rider name for an individual row, country name for a country row. */
+  /** Rider name for an individual row, club name for a club row. */
   readonly name: string;
-  readonly countryName: string;
-  readonly iso2: string;
+  readonly clubName: string;
   readonly dayValues: readonly StandingDayValue[];
-  /** Country rows only: the country's riders' points for this scope. */
+  /** Club rows only: the club's riders' points for this scope. */
   readonly riderPoints: string | null;
-  /** Country rows only: pair, team and relay faults charged to the country. */
-  readonly countryFaults: string | null;
+  /** Club rows only: pair, team and relay faults charged to the club. */
+  readonly clubFaults: string | null;
   readonly total: string;
 }
 
@@ -140,7 +139,7 @@ function buildSet(
   t: Translator,
 ): StandingsSet {
   const includeKeys =
-    subject === "INDIVIDUAL" ? [...directory.riders.keys()] : [...directory.countries.keys()];
+    subject === "INDIVIDUAL" ? [...directory.riders.keys()] : [...directory.clubs.keys()];
 
   const standings = buildStandings(totals, {
     scope,
@@ -162,39 +161,37 @@ function buildSet(
         baseRank: standing.baseRank,
         isTiedAfterTieBreak: standing.isTiedAfterTieBreak,
         name: rider ? shortenRiderName(rider.riderName) : unknown,
-        countryName: rider?.countryName ?? unknown,
-        iso2: rider?.iso2 ?? "",
+        clubName: rider?.clubName ?? unknown,
         dayValues: dayValuesOf(days, (value) =>
           formatPoints(riderTotals?.byDay.get(value) ?? 0),
         ),
         riderPoints: null,
-        countryFaults: null,
+        clubFaults: null,
         total: formatPoints(standing.total),
       };
     }
 
-    const country = directory.countries.get(standing.key);
-    const countryTotals = totals.countries.get(standing.key);
+    const club = directory.clubs.get(standing.key);
+    const clubTotals = totals.clubs.get(standing.key);
     const riderPoints =
       day === null
-        ? countryTotals?.riderPointsOverall
-        : countryTotals?.riderPointsByDay.get(day);
+        ? clubTotals?.riderPointsOverall
+        : clubTotals?.riderPointsByDay.get(day);
     const faults =
-      day === null ? countryTotals?.penaltiesOverall : countryTotals?.penaltiesByDay.get(day);
+      day === null ? clubTotals?.penaltiesOverall : clubTotals?.penaltiesByDay.get(day);
 
     return {
       key: standing.key,
       rank: standing.rank,
       baseRank: standing.baseRank,
       isTiedAfterTieBreak: standing.isTiedAfterTieBreak,
-      name: country?.countryName ?? unknown,
-      countryName: country?.countryName ?? unknown,
-      iso2: country?.iso2 ?? "",
+      name: club?.clubName ?? unknown,
+      clubName: club?.clubName ?? unknown,
       dayValues: dayValuesOf(days, (value) =>
-        formatPoints(countryTotals?.byDay.get(value) ?? 0),
+        formatPoints(clubTotals?.byDay.get(value) ?? 0),
       ),
       riderPoints: formatPoints(riderPoints ?? 0),
-      countryFaults: formatPoints(faults ?? 0),
+      clubFaults: formatPoints(faults ?? 0),
       total: formatPoints(standing.total),
     };
   });
@@ -288,7 +285,7 @@ export function buildStandingsData(results: ChampionshipResults, t: Translator):
   const sets: StandingsSet[] = [];
   for (const subject of ALL_SUBJECTS) {
     const includeKeys =
-      subject === "INDIVIDUAL" ? [...directory.riders.keys()] : [...directory.countries.keys()];
+      subject === "INDIVIDUAL" ? [...directory.riders.keys()] : [...directory.clubs.keys()];
 
     // Raw (no tie-break applied) standings per scope, needed to know what
     // total and which competitors each stored round was originally recorded
@@ -321,17 +318,17 @@ export interface TieBreakRiderOption {
 }
 
 /**
- * The four active riders of each country, which are the riders that take part
- * in a country tie-break round. The reserve never rides the draw.
+ * The four active riders of each club, which are the riders that take part
+ * in a club tie-break round. The reserve never rides the draw.
  */
-export function activeRidersByCountry(
+export function activeRidersByClub(
   directory: ChampionshipParticipantDirectory,
 ): Readonly<Record<string, readonly TieBreakRiderOption[]>> {
   const result: Record<string, TieBreakRiderOption[]> = {};
-  for (const country of directory.countries.keys()) result[country] = [];
+  for (const club of directory.clubs.keys()) result[club] = [];
   for (const rider of directory.riders.values()) {
     if (rider.rosterSlot !== "ACTIVE") continue;
-    const bucket = result[rider.championshipCountryId];
+    const bucket = result[rider.championshipClubId];
     if (!bucket) continue;
     bucket.push({
       championshipRiderId: rider.championshipRiderId,
@@ -351,7 +348,7 @@ export interface StoredTieBreakEntry {
 /**
  * Stored tie-break rounds keyed by `scope:subject`.
  *
- * A country round is stored as one total per country, because that is how the
+ * A club round is stored as one total per club, because that is how the
  * reference workbook records the team round, so only its time can be prefilled
  * rider by rider.
  */

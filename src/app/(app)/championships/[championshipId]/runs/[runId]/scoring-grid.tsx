@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { cn } from "@/lib/cn";
-import { CountryFlag } from "@/components/common/country-flag";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/surfaces";
 import { Input } from "@/components/ui/form-controls";
 import { useI18n } from "@/lib/i18n/client";
@@ -30,10 +29,9 @@ export interface ScoringUnit {
   readonly riders: readonly ScoringRider[];
 }
 
-export interface ScoringCountry {
-  readonly championshipCountryId: string;
-  readonly iso2: string;
-  readonly countryName: string;
+export interface ScoringClub {
+  readonly championshipClubId: string;
+  readonly clubName: string;
   readonly units: readonly ScoringUnit[];
 }
 
@@ -44,12 +42,12 @@ export interface ScoringDraft {
   readonly points: Readonly<Record<string, readonly (number | null)[]>>;
 }
 
-export function buildDraft(countries: readonly ScoringCountry[]): ScoringDraft {
+export function buildDraft(clubs: readonly ScoringClub[]): ScoringDraft {
   const times: Record<string, string> = {};
   const points: Record<string, (number | null)[]> = {};
 
-  for (const country of countries) {
-    for (const unit of country.units) {
+  for (const club of clubs) {
+    for (const unit of club.units) {
       times[unit.runScoringUnitId] = unit.timeSeconds ?? "";
       for (const rider of unit.riders) {
         points[rider.runScoreId] = rider.targets.map((value) =>
@@ -65,11 +63,11 @@ export function buildDraft(countries: readonly ScoringCountry[]): ScoringDraft {
 const TIME_PATTERN = /^\d{0,4}(\.\d{0,2})?$/;
 
 export function isDraftComplete(
-  countries: readonly ScoringCountry[],
+  clubs: readonly ScoringClub[],
   draft: ScoringDraft,
 ): boolean {
-  for (const country of countries) {
-    for (const unit of country.units) {
+  for (const club of clubs) {
+    for (const unit of club.units) {
       const time = draft.times[unit.runScoringUnitId];
       if (!time || !Number.isFinite(Number(time))) return false;
       for (const rider of unit.riders) {
@@ -78,12 +76,12 @@ export function isDraftComplete(
       }
     }
   }
-  return countries.length > 0;
+  return clubs.length > 0;
 }
 
 /** Converts the draft into the payload the save and correct actions accept. */
 export function draftToPayload(
-  countries: readonly ScoringCountry[],
+  clubs: readonly ScoringClub[],
   draft: ScoringDraft,
 ): {
   units: Array<{ runScoringUnitId: string; timeSeconds: string | null }>;
@@ -92,8 +90,8 @@ export function draftToPayload(
   const units: Array<{ runScoringUnitId: string; timeSeconds: string | null }> = [];
   const scores: Array<{ runScoreId: string; targets: Array<number | null> }> = [];
 
-  for (const country of countries) {
-    for (const unit of country.units) {
+  for (const club of clubs) {
+    for (const unit of club.units) {
       const raw = draft.times[unit.runScoringUnitId]?.trim() ?? "";
       units.push({
         runScoringUnitId: unit.runScoringUnitId,
@@ -172,20 +170,20 @@ function PointPicker({
 export function ScoringGrid({
   eventType,
   timeLimitSeconds,
-  countries,
+  clubs,
   draft,
   onChange,
   readOnly = false,
-  confirmedDayTotalByCountry,
+  confirmedDayTotalByClub,
 }: {
   eventType: EventTypeKey;
   timeLimitSeconds: string;
-  countries: readonly ScoringCountry[];
+  clubs: readonly ScoringClub[];
   draft: ScoringDraft;
   onChange: (next: ScoringDraft) => void;
   readOnly?: boolean;
-  /** Every other confirmed run's contribution today, per country, so the day total can be shown live. */
-  confirmedDayTotalByCountry: Readonly<Record<string, string>>;
+  /** Every other confirmed run's contribution today, per club, so the day total can be shown live. */
+  confirmedDayTotalByClub: Readonly<Record<string, string>>;
 }) {
   const { t } = useI18n();
   const definition = getEventTypeDefinition(eventType);
@@ -199,12 +197,12 @@ export function ScoringGrid({
     const input: RunScoringInput = {
       eventTypeKey: eventType,
       timeLimitSeconds,
-      units: countries.flatMap((country) =>
-        country.units.map((unit) => {
+      units: clubs.flatMap((club) =>
+        club.units.map((unit) => {
           const raw = draft.times[unit.runScoringUnitId]?.trim() ?? "";
           return {
             unitIndex: unit.unitIndex,
-            championshipCountryId: country.championshipCountryId,
+            championshipClubId: club.championshipClubId,
             timeSeconds: raw === "" || !Number.isFinite(Number(raw)) ? null : raw,
             riders: unit.riders.map((rider) => ({
               championshipRiderId: rider.championshipRiderId,
@@ -218,16 +216,16 @@ export function ScoringGrid({
 
     const result = scoreRun(input);
     const unitsByKey = new Map(
-      result.units.map((unit) => [`${unit.championshipCountryId}:${unit.unitIndex}`, unit]),
+      result.units.map((unit) => [`${unit.championshipClubId}:${unit.unitIndex}`, unit]),
     );
     const ridersById = new Map(
       result.riders.map((rider) => [rider.championshipRiderId, rider]),
     );
-    const countriesById = new Map(
-      result.countries.map((country) => [country.championshipCountryId, country]),
+    const clubsById = new Map(
+      result.clubs.map((club) => [club.championshipClubId, club]),
     );
-    return { unitsByKey, ridersById, countriesById };
-  }, [countries, draft, eventType, timeLimitSeconds]);
+    return { unitsByKey, ridersById, clubsById };
+  }, [clubs, draft, eventType, timeLimitSeconds]);
 
   function setTime(unitId: string, value: string) {
     if (!TIME_PATTERN.test(value)) return;
@@ -242,43 +240,42 @@ export function ScoringGrid({
 
   return (
     <div className="space-y-4">
-      {countries.map((country) => {
-        const countryResult = computed.countriesById.get(country.championshipCountryId);
+      {clubs.map((club) => {
+        const clubResult = computed.clubsById.get(club.championshipClubId);
         return (
-          <Card key={country.championshipCountryId} className="print-avoid-break">
+          <Card key={club.championshipClubId} className="print-avoid-break">
             <CardHeader className="py-2.5">
               <CardTitle className="flex items-center gap-2 text-sm">
-                <CountryFlag iso2={country.iso2} size="md" />
-                {country.countryName}
+                {club.clubName}
               </CardTitle>
-              {countryResult ? (
+              {clubResult ? (
                 <dl className="flex items-center gap-4 text-xs">
                   <div className="flex items-center gap-1.5">
                     <dt className="text-muted">{t("runs.rawPoints")}</dt>
                     <dd className="numeric font-semibold">
-                      {formatPoints(countryResult.riderPointsTotal)}
+                      {formatPoints(clubResult.riderPointsTotal)}
                     </dd>
                   </div>
                   {isTeamUnit ? (
                     <div className="flex items-center gap-1.5">
                       <dt className="text-muted">{t("runs.penalty")}</dt>
                       <dd className="numeric font-semibold text-danger">
-                        {formatPoints(countryResult.countryPenaltyTotal)}
+                        {formatPoints(clubResult.clubPenaltyTotal)}
                       </dd>
                     </div>
                   ) : null}
                   <div className="flex items-center gap-1.5">
                     <dt className="text-muted">{t("common.total")}</dt>
                     <dd className="numeric font-semibold">
-                      {formatPoints(countryResult.total)}
+                      {formatPoints(clubResult.total)}
                     </dd>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <dt className="text-muted">{t("runs.dayTotal")}</dt>
                     <dd className="numeric font-semibold text-primary">
                       {formatPoints(
-                        dec(confirmedDayTotalByCountry[country.championshipCountryId] ?? ZERO).plus(
-                          countryResult.total,
+                        dec(confirmedDayTotalByClub[club.championshipClubId] ?? ZERO).plus(
+                          clubResult.total,
                         ),
                       )}
                     </dd>
@@ -288,9 +285,9 @@ export function ScoringGrid({
             </CardHeader>
 
             <CardContent className="space-y-3">
-              {country.units.map((unit) => {
+              {club.units.map((unit) => {
                 const unitResult = computed.unitsByKey.get(
-                  `${country.championshipCountryId}:${unit.unitIndex}`,
+                  `${club.championshipClubId}:${unit.unitIndex}`,
                 );
                 const unitTitle =
                   definition.ruleType === "PAIR"
@@ -396,7 +393,7 @@ export function ScoringGrid({
                             inputMode="decimal"
                             autoComplete="off"
                             className="numeric h-8 w-20 text-end"
-                            aria-label={`${unitTitle ?? country.countryName}: ${t("runs.enterTime")}`}
+                            aria-label={`${unitTitle ?? club.clubName}: ${t("runs.enterTime")}`}
                           />
                         </span>
                         {unitResult ? (

@@ -24,7 +24,7 @@ const TABLES = [
   "tie_break_entries",
   "tie_break_rounds",
   "championship_riders",
-  "championship_countries",
+  "championship_clubs",
   "championship_runs",
   "championship_events",
   "championship_days",
@@ -70,9 +70,9 @@ async function main(): Promise<void> {
   await db.execute(sql.raw(`truncate table ${TABLES.join(", ")} restart identity cascade`));
 
   console.log(`
-  Database emptied. The country registry was cleared too, so rebuild with:
+  Database emptied. Clubs are created from the app itself (Clubs page), so
+  rebuild with:
 
-    npm run db:seed
     npm run db:bootstrap-admin
     npm run db:seed-demo
 `);

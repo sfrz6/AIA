@@ -1,11 +1,11 @@
 {
-  "name": "ITPF Official Results",
-  "short_name": "ITPF Results",
-  "description": "Published championship results of the International Tent Pegging Federation.",
+  "name": "AIA Official Results",
+  "short_name": "AIA Results",
+  "description": "Published championship results of Assayel International Academy.",
   "start_url": "/results",
   "display": "standalone",
-  "background_color": "#0c3d4e",
-  "theme_color": "#00718f",
+  "background_color": "#2b1d0f",
+  "theme_color": "#93682e",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }

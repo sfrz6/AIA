@@ -6,7 +6,7 @@ import {
   createChampionshipFixture,
   createSquadRiders,
   createTemplate,
-  countryIdByIso,
+  clubIdByName,
   listRunIds,
 } from "../helpers/fixtures";
 import type { Principal } from "@/lib/auth/session";
@@ -14,7 +14,7 @@ import type { SquadInput } from "@/server/services/championship-setup";
 
 const suite = hasTestDatabase ? describe : describe.skip;
 
-suite("championship country order and optional squads", () => {
+suite("championship club order and optional squads", () => {
   let actor: Principal;
   let db: Awaited<ReturnType<typeof getDatabase>>;
 
@@ -32,10 +32,10 @@ suite("championship country order and optional squads", () => {
     actor = await createActor();
   });
 
-  async function fullSquad(countryId: string, prefix: string): Promise<SquadInput> {
-    const riderIds = await createSquadRiders(countryId, prefix);
+  async function fullSquad(clubId: string, prefix: string): Promise<SquadInput> {
+    const riderIds = await createSquadRiders(clubId, prefix);
     return {
-      countryId,
+      clubId,
       riders: riderIds.map((riderId, index) => ({
         riderId,
         rosterSlot: index < 4 ? ("ACTIVE" as const) : ("RESERVE" as const),
@@ -44,7 +44,7 @@ suite("championship country order and optional squads", () => {
     };
   }
 
-  it("assigns the country order from the order squads were submitted in, not alphabetically", async () => {
+  it("assigns the club order from the order squads were submitted in, not alphabetically", async () => {
     const templateId = await createTemplate("Order template", [
       { dayNumber: 1, eventType: "INDIVIDUAL_LANCE", runs: 1 },
     ]);
@@ -53,9 +53,9 @@ suite("championship country order and optional squads", () => {
     );
 
     // Submitted in reverse alphabetical order: Pakistan, Oman, Jordan.
-    const pakistan = await fullSquad(await countryIdByIso("PK"), "PK");
-    const oman = await fullSquad(await countryIdByIso("OM"), "OM");
-    const jordan = await fullSquad(await countryIdByIso("JO"), "JO");
+    const pakistan = await fullSquad(await clubIdByName("PK"), "PK");
+    const oman = await fullSquad(await clubIdByName("OM"), "OM");
+    const jordan = await fullSquad(await clubIdByName("JO"), "JO");
 
     const created = await db.transaction((tx) =>
       createChampionshipFromTemplate(tx, actor, {
@@ -69,14 +69,14 @@ suite("championship country order and optional squads", () => {
       }),
     );
 
-    const { listChampionshipCountries } = await import("@/server/services/championships");
-    const listed = await listChampionshipCountries(created.id, "en");
+    const { listChampionshipClubs } = await import("@/server/services/championships");
+    const listed = await listChampionshipClubs(created.id, "en");
 
-    expect(listed.map((row) => row.iso2)).toEqual(["PK", "OM", "JO"]);
+    expect(listed.map((row) => row.name)).toEqual(["PK", "OM", "JO"]);
     expect(listed.map((row) => row.orderIndex)).toEqual([0, 1, 2]);
   });
 
-  it("allows a country to be created with no riders selected yet", async () => {
+  it("allows a club to be created with no riders selected yet", async () => {
     const templateId = await createTemplate("Optional riders template", [
       { dayNumber: 1, eventType: "INDIVIDUAL_LANCE", runs: 1 },
     ]);
@@ -84,8 +84,8 @@ suite("championship country order and optional squads", () => {
       "@/server/services/championship-setup"
     );
 
-    const jordan = await countryIdByIso("JO");
-    const oman = await fullSquad(await countryIdByIso("OM"), "OM");
+    const jordan = await clubIdByName("JO");
+    const oman = await fullSquad(await clubIdByName("OM"), "OM");
 
     const created = await db.transaction((tx) =>
       createChampionshipFromTemplate(tx, actor, {
@@ -95,36 +95,36 @@ suite("championship country order and optional squads", () => {
         startDate: "2026-09-18",
         location: "Amman",
         organizer: null,
-        squads: [{ countryId: jordan, riders: [] }, oman],
+        squads: [{ clubId: jordan, riders: [] }, oman],
       }),
     );
 
-    const { listChampionshipCountries, listChampionshipRiders } = await import(
+    const { listChampionshipClubs, listChampionshipRiders } = await import(
       "@/server/services/championships"
     );
-    const countries = await listChampionshipCountries(created.id, "en");
+    const clubs = await listChampionshipClubs(created.id, "en");
     const riders = await listChampionshipRiders(created.id, "en");
 
-    expect(countries).toHaveLength(2);
-    const jordanParticipant = countries.find((row) => row.iso2 === "JO")!;
-    expect(riders.filter((r) => r.championshipCountryId === jordanParticipant.championshipCountryId)).toHaveLength(0);
-    const omanParticipant = countries.find((row) => row.iso2 === "OM")!;
-    expect(riders.filter((r) => r.championshipCountryId === omanParticipant.championshipCountryId)).toHaveLength(5);
+    expect(clubs).toHaveLength(2);
+    const jordanParticipant = clubs.find((row) => row.name === "JO")!;
+    expect(riders.filter((r) => r.championshipClubId === jordanParticipant.championshipClubId)).toHaveLength(0);
+    const omanParticipant = clubs.find((row) => row.name === "OM")!;
+    expect(riders.filter((r) => r.championshipClubId === omanParticipant.championshipClubId)).toHaveLength(5);
   });
 
   it("rejects a squad that is partially picked rather than empty or complete", async () => {
     const { validateSquad } = await import("@/server/services/championship-setup");
 
-    expect(() => validateSquad({ countryId: "x", riders: [] })).not.toThrow();
+    expect(() => validateSquad({ clubId: "x", riders: [] })).not.toThrow();
     expect(() =>
       validateSquad({
-        countryId: "x",
+        clubId: "x",
         riders: [{ riderId: "r1", rosterSlot: "ACTIVE", initialOrder: 1 }],
       }),
     ).toThrow(/exactly 4 active riders/i);
   });
 
-  it("refuses the run's entry order while a country's squad is still empty", async () => {
+  it("refuses the run's entry order while a club's squad is still empty", async () => {
     const templateId = await createTemplate("Empty squad run template", [
       { dayNumber: 1, eventType: "INDIVIDUAL_LANCE", runs: 1 },
     ]);
@@ -132,8 +132,8 @@ suite("championship country order and optional squads", () => {
       "@/server/services/championship-setup"
     );
 
-    const jordan = await countryIdByIso("JO");
-    const oman = await fullSquad(await countryIdByIso("OM"), "OM");
+    const jordan = await clubIdByName("JO");
+    const oman = await fullSquad(await clubIdByName("OM"), "OM");
 
     const created = await db.transaction((tx) =>
       createChampionshipFromTemplate(tx, actor, {
@@ -143,95 +143,95 @@ suite("championship country order and optional squads", () => {
         startDate: "2026-09-18",
         location: "Amman",
         organizer: null,
-        squads: [{ countryId: jordan, riders: [] }, oman],
+        squads: [{ clubId: jordan, riders: [] }, oman],
       }),
     );
 
     const runId = (await listRunIds(created.id))[0]!;
-    const { getRunEntryOrderState, confirmCountryEntryOrder } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder } = await import(
       "@/server/services/runs"
     );
     const state = await getRunEntryOrderState(runId, "en");
-    const jordanCountry = state!.countries.find((c) => c.iso2 === "JO")!;
+    const jordanClub = state!.clubs.find((c) => c.clubName === "JO")!;
 
     await expect(
       db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: jordanCountry.championshipCountryId,
+          championshipClubId: jordanClub.championshipClubId,
           decision: "NO_CHANGE",
         }),
       ),
     ).rejects.toThrow(/needs 4 active riders/i);
   });
 
-  it("reorders countries and reflects the new order everywhere countries are listed", async () => {
-    const { championshipId, countryIds } = await createChampionshipFixture({
+  it("reorders clubs and reflects the new order everywhere clubs are listed", async () => {
+    const { championshipId, clubIds } = await createChampionshipFixture({
       actor,
       templateId: await createTemplate("Reorder template", [
         { dayNumber: 1, eventType: "INDIVIDUAL_LANCE", runs: 1 },
       ]),
-      isoCodes: ["JO", "OM", "PK"],
+      clubNames: ["JO", "OM", "PK"],
     });
 
-    const { listChampionshipCountries } = await import("@/server/services/championships");
-    const { reorderChampionshipCountries } = await import(
+    const { listChampionshipClubs } = await import("@/server/services/championships");
+    const { reorderChampionshipClubs } = await import(
       "@/server/services/championship-setup"
     );
-    const { championshipCountries } = await import("@/db/schema");
+    const { championshipClubs } = await import("@/db/schema");
 
-    const before = await listChampionshipCountries(championshipId, "en");
-    expect(before.map((row) => row.countryId)).toEqual(countryIds);
+    const before = await listChampionshipClubs(championshipId, "en");
+    expect(before.map((row) => row.clubId)).toEqual(clubIds);
 
     // Reverse the order.
-    const reversed = [...before].reverse().map((row) => row.championshipCountryId);
+    const reversed = [...before].reverse().map((row) => row.championshipClubId);
     await db.transaction((tx) =>
-      reorderChampionshipCountries(tx, actor, {
+      reorderChampionshipClubs(tx, actor, {
         championshipId,
-        orderedChampionshipCountryIds: reversed,
+        orderedChampionshipClubIds: reversed,
       }),
     );
 
-    const after = await listChampionshipCountries(championshipId, "en");
-    expect(after.map((row) => row.championshipCountryId)).toEqual(reversed);
+    const after = await listChampionshipClubs(championshipId, "en");
+    expect(after.map((row) => row.championshipClubId)).toEqual(reversed);
     expect(after.map((row) => row.orderIndex)).toEqual([0, 1, 2]);
 
     // The entry order screen for the first run picks up the new order too.
     const runId = (await listRunIds(championshipId))[0]!;
     const { getRunEntryOrderState } = await import("@/server/services/runs");
     const state = await getRunEntryOrderState(runId, "en");
-    expect(state!.countries.map((c) => c.championshipCountryId)).toEqual(reversed);
+    expect(state!.clubs.map((c) => c.championshipClubId)).toEqual(reversed);
 
     // No duplicate order_index was ever left behind.
     const rows = await db
-      .select({ orderIndex: championshipCountries.orderIndex })
-      .from(championshipCountries)
-      .where(eq(championshipCountries.championshipId, championshipId));
+      .select({ orderIndex: championshipClubs.orderIndex })
+      .from(championshipClubs)
+      .where(eq(championshipClubs.championshipId, championshipId));
     expect(new Set(rows.map((row) => row.orderIndex)).size).toBe(rows.length);
   });
 
-  it("rejects a reorder whose countries do not match the championship", async () => {
+  it("rejects a reorder whose clubs do not match the championship", async () => {
     const { championshipId } = await createChampionshipFixture({
       actor,
       templateId: await createTemplate("Mismatch template", [
         { dayNumber: 1, eventType: "INDIVIDUAL_LANCE", runs: 1 },
       ]),
     });
-    const { reorderChampionshipCountries } = await import(
+    const { reorderChampionshipClubs } = await import(
       "@/server/services/championship-setup"
     );
 
     await expect(
       db.transaction((tx) =>
-        reorderChampionshipCountries(tx, actor, {
+        reorderChampionshipClubs(tx, actor, {
           championshipId,
-          orderedChampionshipCountryIds: ["00000000-0000-0000-0000-000000000099"],
+          orderedChampionshipClubIds: ["00000000-0000-0000-0000-000000000099"],
         }),
       ),
     ).rejects.toThrow(/does not match this championship/i);
   });
 
-  it("locks the country order once the championship's first run has started", async () => {
+  it("locks the club order once the championship's first run has started", async () => {
     const { championshipId } = await createChampionshipFixture({
       actor,
       templateId: await createTemplate("Lock template", [
@@ -239,13 +239,13 @@ suite("championship country order and optional squads", () => {
       ]),
     });
 
-    const { hasChampionshipStarted, reorderChampionshipCountries } = await import(
+    const { hasChampionshipStarted, reorderChampionshipClubs } = await import(
       "@/server/services/championship-setup"
     );
-    const { listChampionshipCountries, getRunContext } = await import(
+    const { listChampionshipClubs, getRunContext } = await import(
       "@/server/services/championships"
     );
-    const { getRunEntryOrderState, confirmCountryEntryOrder, startRun } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder, startRun } = await import(
       "@/server/services/runs"
     );
 
@@ -253,11 +253,11 @@ suite("championship country order and optional squads", () => {
 
     const runId = (await listRunIds(championshipId))[0]!;
     const state = await getRunEntryOrderState(runId, "en");
-    for (const country of state!.countries) {
+    for (const club of state!.clubs) {
       await db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: country.championshipCountryId,
+          championshipClubId: club.championshipClubId,
           decision: "NO_CHANGE",
         }),
       );
@@ -265,11 +265,11 @@ suite("championship country order and optional squads", () => {
 
     // Still unlocked: entry orders confirmed, but the run has not started.
     expect(await hasChampionshipStarted(championshipId)).toBe(false);
-    const countries = await listChampionshipCountries(championshipId, "en");
+    const clubs = await listChampionshipClubs(championshipId, "en");
     await db.transaction((tx) =>
-      reorderChampionshipCountries(tx, actor, {
+      reorderChampionshipClubs(tx, actor, {
         championshipId,
-        orderedChampionshipCountryIds: [...countries].reverse().map((c) => c.championshipCountryId),
+        orderedChampionshipClubIds: [...clubs].reverse().map((c) => c.championshipClubId),
       }),
     );
 
@@ -278,14 +278,14 @@ suite("championship country order and optional squads", () => {
 
     expect(await hasChampionshipStarted(championshipId)).toBe(true);
 
-    const afterStart = await listChampionshipCountries(championshipId, "en");
+    const afterStart = await listChampionshipClubs(championshipId, "en");
     await expect(
       db.transaction((tx) =>
-        reorderChampionshipCountries(tx, actor, {
+        reorderChampionshipClubs(tx, actor, {
           championshipId,
-          orderedChampionshipCountryIds: [...afterStart]
+          orderedChampionshipClubIds: [...afterStart]
             .reverse()
-            .map((c) => c.championshipCountryId),
+            .map((c) => c.championshipClubId),
         }),
       ),
     ).rejects.toThrow(/already started/i);

@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   ClipboardList,
-  Flag,
   LayoutDashboard,
   LogOut,
   ScrollText,
+  Shield,
   Trophy,
   Users,
 } from "lucide-react";
@@ -14,7 +14,7 @@ import { hasPermission } from "@/domain/permissions";
 import { getTranslator } from "@/lib/i18n/server";
 import { AppSidebar, type NavItem } from "@/components/layout/app-nav";
 import { LocaleSwitcher, ThemeToggle } from "@/components/layout/toolbar";
-import { ItpfLogo } from "@/components/common/itpf-logo";
+import { AiaLogo } from "@/components/common/aia-logo";
 import { signOutAction } from "@/server/actions/auth";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     items.push({ href: "/templates", labelKey: "nav.templates", icon: <ClipboardList /> });
   }
   if (hasPermission(principal, "MANAGE_RIDERS")) {
-    items.push({ href: "/countries", labelKey: "nav.countries", icon: <Flag /> });
+    items.push({ href: "/clubs", labelKey: "nav.clubs", icon: <Shield /> });
   }
   if (principal.isAdmin) {
     items.push({ href: "/users", labelKey: "nav.users", icon: <Users /> });
@@ -41,7 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const header = (
     <Link href="/" className="flex items-center gap-2.5 rounded-md p-1">
-      <ItpfLogo width={40} priority />
+      <AiaLogo width={40} priority />
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold text-shell-foreground">
           {t("common.appNameShort")}

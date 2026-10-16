@@ -7,8 +7,8 @@ config({ path: ".env", quiet: true });
 
 export const E2E_ADMIN = { username: "e2e-admin", password: "E2ePassword!2026" } as const;
 
-/** Countries the suite competes with, chosen so their flags are seeded. */
-export const E2E_COUNTRIES = ["Jordan", "Oman"] as const;
+/** Clubs the suite competes with, chosen so their flags are seeded. */
+export const E2E_CLUBS = ["Jordan", "Oman"] as const;
 
 export function e2eDatabaseUrl(): string {
   const url = process.env.E2E_DATABASE_URL ?? process.env.TEST_DATABASE_URL;
@@ -22,8 +22,8 @@ export function e2eDatabaseUrl(): string {
 
 /**
  * Prepares a dedicated database for the end to end suite: schema up to date,
- * country registry seeded, one administrator, and riders registered for the two
- * competing countries so the championship wizard has a squad to pick from.
+ * club registry seeded, one administrator, and riders registered for the two
+ * competing clubs so the championship wizard has a squad to pick from.
  *
  * Deliberately destructive, which is why it refuses to touch anything that is
  * not an explicitly configured end to end database.
@@ -38,8 +38,7 @@ export default async function globalSetup(): Promise<void> {
 
   await migrate(db as never, { migrationsFolder: "./src/db/migrations" });
 
-  const { countries, riders, users } = await import("../src/db/schema");
-  const { SEED_COUNTRIES } = await import("../src/lib/countries/iso-countries");
+  const { clubs, riders, users } = await import("../src/db/schema");
   const { hashPassword } = await import("../src/lib/auth/password");
   const { eq, inArray } = await import("drizzle-orm");
 
@@ -48,7 +47,7 @@ export default async function globalSetup(): Promise<void> {
       `truncate table audit_logs, run_revisions, run_score_targets, run_scores,
        run_scoring_units, run_entry_order_items, run_entry_orders,
        tie_break_entry_scores, tie_break_entries, tie_break_rounds,
-       championship_riders, championship_countries, championship_runs,
+       championship_riders, championship_clubs, championship_runs,
        championship_events, championship_days, championships, template_runs,
        template_events, template_days, championship_templates, riders, sessions,
        user_permissions, users restart identity cascade`,
@@ -56,19 +55,9 @@ export default async function globalSetup(): Promise<void> {
   );
 
   await db
-    .insert(countries)
-    .values(
-      SEED_COUNTRIES.map((country) => ({
-        iso2: country.iso2,
-        iso3: country.iso3,
-        nameEn: country.nameEn,
-        nameAr: country.nameAr,
-      })),
-    )
-    .onConflictDoUpdate({
-      target: countries.iso2,
-      set: { nameEn: sql`excluded.name_en`, nameAr: sql`excluded.name_ar` },
-    });
+    .insert(clubs)
+    .values(E2E_CLUBS.map((name) => ({ name })))
+    .onConflictDoNothing();
 
   await db.insert(users).values({
     name: "End to end administrator",
@@ -78,18 +67,18 @@ export default async function globalSetup(): Promise<void> {
     isActive: true,
   });
 
-  // Four riders per country. The suite adds the fifth through the interface, so
+  // Four riders per club. The suite adds the fifth through the interface, so
   // the "Add rider" path is exercised by the happy path itself.
   const competing = await db
-    .select({ id: countries.id, iso2: countries.iso2 })
-    .from(countries)
-    .where(inArray(countries.iso2, ["JO", "OM"]));
+    .select({ id: clubs.id, name: clubs.name })
+    .from(clubs)
+    .where(inArray(clubs.name, [...E2E_CLUBS]));
 
-  for (const country of competing) {
+  for (const club of competing) {
     await db.insert(riders).values(
       Array.from({ length: 4 }, (_, index) => ({
-        countryId: country.id,
-        fullName: `${country.iso2} Rider ${index + 1}`,
+        clubId: club.id,
+        fullName: `${club.name} Rider ${index + 1}`,
       })),
     );
   }

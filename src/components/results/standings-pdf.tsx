@@ -1,4 +1,3 @@
-import { CountryFlag } from "@/components/common/country-flag";
 import type { Translator } from "@/lib/i18n";
 import type { DayNumber } from "@/domain/results";
 import type { StandingsSet } from "./standings-data";
@@ -23,7 +22,7 @@ export function StandingsPdfTable({
   days: readonly DayNumber[];
   t: Translator;
 }) {
-  const isCountry = set.subject === "COUNTRY";
+  const isClub = set.subject === "CLUB";
   const showDayBreakdown = set.scope === "OVERALL" && days.length > 1;
 
   if (set.rows.length === 0) {
@@ -36,15 +35,15 @@ export function StandingsPdfTable({
         <tr className="border-b border-black bg-neutral-100">
           <th className="w-10 border-e border-black px-1 py-1 text-center">{t("common.rank")}</th>
           <th className="border-e border-black px-2 py-1 text-start">
-            {isCountry ? t("common.country") : t("common.rider")}
+            {isClub ? t("common.club") : t("common.rider")}
           </th>
-          {isCountry ? (
+          {isClub ? (
             <>
               <th className="w-16 border-e border-black px-1 py-1 text-center">
                 {t("results.riderPoints")}
               </th>
               <th className="w-16 border-e border-black px-1 py-1 text-center">
-                {t("results.countryFaults")}
+                {t("results.clubFaults")}
               </th>
             </>
           ) : null}
@@ -69,12 +68,11 @@ export function StandingsPdfTable({
               <td className="numeric border-e border-black px-1 py-1.5 text-center">{row.rank}</td>
               <td className="border-e border-black px-2 py-1.5">
                 <span className="inline-flex items-center gap-1.5">
-                  <CountryFlag iso2={row.iso2} size="sm" />
                   <span>
                     {row.name}
-                    {!isCountry ? (
+                    {!isClub ? (
                       <span className="ms-1 text-[8pt] font-normal text-neutral-600">
-                        ({row.countryName})
+                        ({row.clubName})
                       </span>
                     ) : null}
                   </span>
@@ -85,13 +83,13 @@ export function StandingsPdfTable({
                   ) : null}
                 </span>
               </td>
-              {isCountry ? (
+              {isClub ? (
                 <>
                   <td className="numeric border-e border-black px-1 py-1.5 text-center">
                     {row.riderPoints}
                   </td>
                   <td className="numeric border-e border-black px-1 py-1.5 text-center">
-                    {row.countryFaults}
+                    {row.clubFaults}
                   </td>
                 </>
               ) : null}

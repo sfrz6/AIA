@@ -17,7 +17,7 @@ const riderNameSchema = z
   .max(120, "A rider name must be at most 120 characters.");
 
 const createSchema = z.object({
-  countryId: z.uuid(),
+  clubId: z.uuid(),
   fullName: riderNameSchema,
 });
 
@@ -27,7 +27,7 @@ export interface CreatedRider {
 }
 
 export async function createRiderAction(input: {
-  countryId: string;
+  clubId: string;
   fullName: string;
 }): Promise<ActionResult<CreatedRider>> {
   return run(async () => {
@@ -45,13 +45,13 @@ export async function createRiderAction(input: {
         action: "RIDER_CREATED",
         entityType: "rider",
         entityId: rider.id,
-        after: { countryId: rider.countryId, fullName: rider.fullName },
+        after: { clubId: rider.clubId, fullName: rider.fullName },
       });
       return rider;
     });
 
-    revalidatePath(`/countries/${parsed.data.countryId}`);
-    revalidatePath("/countries");
+    revalidatePath(`/clubs/${parsed.data.clubId}`);
+    revalidatePath("/clubs");
     return ok({ id: created.id, fullName: created.fullName });
   });
 }
@@ -71,9 +71,9 @@ export async function renameRiderAction(input: {
 
     const fullName = parsed.data.fullName.replace(/\s+/g, " ");
 
-    const countryId = await getDb().transaction(async (tx) => {
+    const clubId = await getDb().transaction(async (tx) => {
       const [existing] = await tx
-        .select({ id: riders.id, fullName: riders.fullName, countryId: riders.countryId })
+        .select({ id: riders.id, fullName: riders.fullName, clubId: riders.clubId })
         .from(riders)
         .where(eq(riders.id, parsed.data.riderId))
         .limit(1);
@@ -84,7 +84,7 @@ export async function renameRiderAction(input: {
         .from(riders)
         .where(
           and(
-            eq(riders.countryId, existing.countryId),
+            eq(riders.clubId, existing.clubId),
             sql`lower(btrim(${riders.fullName})) = lower(btrim(${fullName}))`,
             sql`${riders.id} <> ${existing.id}`,
           ),
@@ -92,9 +92,9 @@ export async function renameRiderAction(input: {
         .limit(1);
       if (clash) {
         throw new DomainError(
-          "A rider with this name already exists for this country.",
+          "A rider with this name already exists for this club.",
           "CONFLICT",
-          { fullName: "A rider with this name already exists for this country." },
+          { fullName: "A rider with this name already exists for this club." },
         );
       }
 
@@ -111,10 +111,10 @@ export async function renameRiderAction(input: {
         after: { fullName },
       });
 
-      return existing.countryId;
+      return existing.clubId;
     });
 
-    revalidatePath(`/countries/${countryId}`);
+    revalidatePath(`/clubs/${clubId}`);
     return ok();
   });
 }
@@ -136,9 +136,9 @@ export async function setRiderRetiredAction(input: {
     const parsed = retireSchema.safeParse(input);
     if (!parsed.success) throw new DomainError("Invalid request.", "VALIDATION");
 
-    const countryId = await getDb().transaction(async (tx) => {
+    const clubId = await getDb().transaction(async (tx) => {
       const [existing] = await tx
-        .select({ id: riders.id, countryId: riders.countryId, isActive: riders.isActive })
+        .select({ id: riders.id, clubId: riders.clubId, isActive: riders.isActive })
         .from(riders)
         .where(eq(riders.id, parsed.data.riderId))
         .limit(1);
@@ -157,11 +157,11 @@ export async function setRiderRetiredAction(input: {
         after: { isActive: !parsed.data.retired },
       });
 
-      return existing.countryId;
+      return existing.clubId;
     });
 
-    revalidatePath(`/countries/${countryId}`);
-    revalidatePath("/countries");
+    revalidatePath(`/clubs/${clubId}`);
+    revalidatePath("/clubs");
     return ok();
   });
 }

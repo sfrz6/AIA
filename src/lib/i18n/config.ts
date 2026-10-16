@@ -4,7 +4,7 @@ export type Locale = (typeof LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
 
-export const LOCALE_COOKIE = "itpf_locale";
+export const LOCALE_COOKIE = "aia_locale";
 
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",

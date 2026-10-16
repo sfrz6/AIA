@@ -85,11 +85,11 @@ suite("run workflow against a real database", () => {
     expect(detail!.days[0]!.events[0]!.runs[0]!.pegSizeCm).toBe("6.0");
   });
 
-  it("requires every country to confirm its entry order before the run can start", async () => {
+  it("requires every club to confirm its entry order before the run can start", async () => {
     const { runIds, championshipId } = await setUp("INDIVIDUAL_LANCE");
     const runId = runIds[0]!;
 
-    const { startRun, getRunEntryOrderState, confirmCountryEntryOrder } = await import(
+    const { startRun, getRunEntryOrderState, confirmClubEntryOrder } = await import(
       "@/server/services/runs"
     );
 
@@ -101,11 +101,11 @@ suite("run workflow against a real database", () => {
     expect(state!.totalCount).toBe(2);
     expect(state!.allConfirmed).toBe(false);
 
-    for (const country of state!.countries) {
+    for (const club of state!.clubs) {
       await db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: country.championshipCountryId,
+          championshipClubId: club.championshipClubId,
           decision: "NO_CHANGE",
         }),
       );
@@ -119,41 +119,41 @@ suite("run workflow against a real database", () => {
 
   it("uses the nominated order for the first run and carries it into later runs of the same event automatically", async () => {
     const { runIds } = await setUp("INDIVIDUAL_LANCE");
-    const { getRunEntryOrderState, confirmCountryEntryOrder } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder } = await import(
       "@/server/services/runs"
     );
 
     const first = runIds[0]!;
     const second = runIds[1]!;
     const state = await getRunEntryOrderState(first, "en");
-    const country = state!.countries[0]!;
-    const nominated = country.roster
+    const club = state!.clubs[0]!;
+    const nominated = club.roster
       .filter((member) => member.rosterSlot === "ACTIVE")
       .sort((a, b) => (a.initialOrder ?? 0) - (b.initialOrder ?? 0))
       .map((member) => member.championshipRiderId);
 
-    for (const participant of state!.countries) {
+    for (const participant of state!.clubs) {
       await db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId: first,
-          championshipCountryId: participant.championshipCountryId,
+          championshipClubId: participant.championshipClubId,
           decision: "NO_CHANGE",
         }),
       );
     }
 
     const firstState = await getRunEntryOrderState(first, "en");
-    expect(firstState!.countries[0]!.confirmedOrder).toEqual(nominated);
+    expect(firstState!.clubs[0]!.confirmedOrder).toEqual(nominated);
     expect(firstState!.run.status).toBe("READY");
 
     // The second run of the same event is carried over automatically, with
     // no separate confirmation step, as soon as the first run is complete.
     const secondState = await getRunEntryOrderState(second, "en");
-    const secondCountry = secondState!.countries.find(
-      (entry) => entry.championshipCountryId === country.championshipCountryId,
+    const secondClub = secondState!.clubs.find(
+      (entry) => entry.championshipClubId === club.championshipClubId,
     )!;
-    expect(secondCountry.confirmedOrder).toEqual(nominated);
-    expect(secondCountry.decision).toBe("NO_CHANGE");
+    expect(secondClub.confirmedOrder).toEqual(nominated);
+    expect(secondClub.decision).toBe("NO_CHANGE");
     expect(secondState!.allConfirmed).toBe(true);
     expect(secondState!.run.status).toBe("READY");
 
@@ -161,9 +161,9 @@ suite("run workflow against a real database", () => {
     // the second run's order on its own is rejected.
     await expect(
       db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId: second,
-          championshipCountryId: country.championshipCountryId,
+          championshipClubId: club.championshipClubId,
           decision: "CHANGED",
           order: [nominated[3]!, nominated[2]!, nominated[1]!, nominated[0]!],
         }),
@@ -175,32 +175,32 @@ suite("run workflow against a real database", () => {
     // carried into the second run too.
     const changed = [nominated[3]!, nominated[2]!, nominated[1]!, nominated[0]!];
     await db.transaction((tx) =>
-      confirmCountryEntryOrder(tx, actor, {
+      confirmClubEntryOrder(tx, actor, {
         runId: first,
-        championshipCountryId: country.championshipCountryId,
+        championshipClubId: club.championshipClubId,
         decision: "CHANGED",
         order: changed,
       }),
     );
 
     const secondAfterChange = await getRunEntryOrderState(second, "en");
-    const secondCountryAfterChange = secondAfterChange!.countries.find(
-      (entry) => entry.championshipCountryId === country.championshipCountryId,
+    const secondClubAfterChange = secondAfterChange!.clubs.find(
+      (entry) => entry.championshipClubId === club.championshipClubId,
     )!;
-    expect(secondCountryAfterChange.confirmedOrder).toEqual(changed);
+    expect(secondClubAfterChange.confirmedOrder).toEqual(changed);
   });
 
   it("allows the reserve to be substituted through a change of order", async () => {
     const { runIds } = await setUp("INDIVIDUAL_LANCE");
-    const { getRunEntryOrderState, confirmCountryEntryOrder } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder } = await import(
       "@/server/services/runs"
     );
 
     const runId = runIds[0]!;
     const state = await getRunEntryOrderState(runId, "en");
-    const country = state!.countries[0]!;
-    const active = country.roster.filter((member) => member.rosterSlot === "ACTIVE");
-    const reserve = country.roster.find((member) => member.rosterSlot === "RESERVE")!;
+    const club = state!.clubs[0]!;
+    const active = club.roster.filter((member) => member.rosterSlot === "ACTIVE");
+    const reserve = club.roster.find((member) => member.rosterSlot === "RESERVE")!;
 
     const order = [
       reserve.championshipRiderId,
@@ -210,35 +210,35 @@ suite("run workflow against a real database", () => {
     ];
 
     await db.transaction((tx) =>
-      confirmCountryEntryOrder(tx, actor, {
+      confirmClubEntryOrder(tx, actor, {
         runId,
-        championshipCountryId: country.championshipCountryId,
+        championshipClubId: club.championshipClubId,
         decision: "CHANGED",
         order,
       }),
     );
 
     const after = await getRunEntryOrderState(runId, "en");
-    expect(after!.countries[0]!.confirmedOrder).toEqual(order);
+    expect(after!.clubs[0]!.confirmedOrder).toEqual(order);
   });
 
   it("rejects an entry order that names a rider from another squad", async () => {
     const { runIds } = await setUp("INDIVIDUAL_LANCE");
-    const { getRunEntryOrderState, confirmCountryEntryOrder } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder } = await import(
       "@/server/services/runs"
     );
 
     const runId = runIds[0]!;
     const state = await getRunEntryOrderState(runId, "en");
-    const [first, second] = state!.countries;
+    const [first, second] = state!.clubs;
     const foreign = second!.roster[0]!.championshipRiderId;
     const own = first!.roster.filter((m) => m.rosterSlot === "ACTIVE").slice(0, 3);
 
     await expect(
       db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: first!.championshipCountryId,
+          championshipClubId: first!.championshipClubId,
           decision: "CHANGED",
           order: [...own.map((m) => m.championshipRiderId), foreign],
         }),
@@ -246,29 +246,29 @@ suite("run workflow against a real database", () => {
     ).rejects.toThrow(/not in the squad/i);
   });
 
-  it("builds two pair units per country for a pair event", async () => {
+  it("builds two pair units per club for a pair event", async () => {
     const { runIds } = await setUp("PAIR_LANCE");
-    const { getRunEntryOrderState, confirmCountryEntryOrder, getRunScoringState } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder, getRunScoringState } = await import(
       "@/server/services/runs"
     );
 
     const runId = runIds[0]!;
     const state = await getRunEntryOrderState(runId, "en");
-    for (const country of state!.countries) {
+    for (const club of state!.clubs) {
       await db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: country.championshipCountryId,
+          championshipClubId: club.championshipClubId,
           decision: "NO_CHANGE",
         }),
       );
     }
 
     const scoring = await getRunScoringState(runId, "en");
-    expect(scoring!.countries).toHaveLength(2);
-    for (const country of scoring!.countries) {
-      expect(country.units).toHaveLength(2);
-      for (const unit of country.units) {
+    expect(scoring!.clubs).toHaveLength(2);
+    for (const club of scoring!.clubs) {
+      expect(club.units).toHaveLength(2);
+      for (const unit of club.units) {
         expect(unit.riders).toHaveLength(2);
         expect(unit.riders.map((rider) => rider.positionInUnit)).toEqual([1, 2]);
       }
@@ -277,26 +277,26 @@ suite("run workflow against a real database", () => {
 
   it("builds one unit of four riders for a team event", async () => {
     const { runIds } = await setUp("TEAM_LANCE");
-    const { getRunEntryOrderState, confirmCountryEntryOrder, getRunScoringState } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder, getRunScoringState } = await import(
       "@/server/services/runs"
     );
 
     const runId = runIds[0]!;
     const state = await getRunEntryOrderState(runId, "en");
-    for (const country of state!.countries) {
+    for (const club of state!.clubs) {
       await db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: country.championshipCountryId,
+          championshipClubId: club.championshipClubId,
           decision: "NO_CHANGE",
         }),
       );
     }
 
     const scoring = await getRunScoringState(runId, "en");
-    for (const country of scoring!.countries) {
-      expect(country.units).toHaveLength(1);
-      expect(country.units[0]!.riders).toHaveLength(4);
+    for (const club of scoring!.clubs) {
+      expect(club.units).toHaveLength(1);
+      expect(club.units[0]!.riders).toHaveLength(4);
     }
   });
 });

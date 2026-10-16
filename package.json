@@ -1,8 +1,8 @@
 {
-  "name": "itpf-tent-pegging",
+  "name": "aia-tent-pegging",
   "version": "1.0.0",
   "private": true,
-  "description": "ITPF Tent Pegging Competition Management and Scoring System",
+  "description": "Assayel International Academy Tent Pegging Competition Management and Scoring System",
   "type": "module",
   "scripts": {
     "dev": "next dev",
@@ -15,7 +15,6 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts",
     "db:seed-demo": "tsx scripts/seed-demo.ts",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "db:reset": "tsx scripts/reset.ts"

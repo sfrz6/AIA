@@ -6,7 +6,7 @@ import { sessions, userPermissions, users } from "@/db/schema";
 import { serverEnv, isProduction } from "@/lib/env";
 import type { Permission } from "@/domain/permissions";
 
-export const SESSION_COOKIE = "itpf_session";
+export const SESSION_COOKIE = "aia_session";
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // One competition day.
 const RENEW_WHEN_REMAINING_MS = 2 * 60 * 60 * 1000;
 

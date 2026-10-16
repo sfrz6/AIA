@@ -21,9 +21,9 @@ export interface RiderScoreInput {
 }
 
 export interface ScoringUnitInput {
-  /** 0-based index of the unit inside the country for this run. */
+  /** 0-based index of the unit inside the club for this run. */
   readonly unitIndex: number;
-  readonly championshipCountryId: string;
+  readonly championshipClubId: string;
   /** Shared time for the unit in seconds, or `null` when not recorded yet. */
   readonly timeSeconds: Numeric | null;
   readonly riders: readonly RiderScoreInput[];
@@ -37,7 +37,7 @@ export interface RunScoringInput {
 
 export interface RiderRunResult {
   readonly championshipRiderId: string;
-  readonly championshipCountryId: string;
+  readonly championshipClubId: string;
   readonly unitIndex: number;
   readonly positionInUnit: number;
   /** Sum of the rider's own targets, before any time penalty. */
@@ -45,7 +45,7 @@ export interface RiderRunResult {
   /**
    * The rider's score after any penalty that is attributed to the rider. For
    * pair, team and relay events this equals `rawPoints`, because the penalty
-   * belongs to the country rather than to the rider.
+   * belongs to the club rather than to the rider.
    */
   readonly netPoints: Decimal;
   /** Value this run adds to the rider's individual standings. */
@@ -56,7 +56,7 @@ export interface RiderRunResult {
 
 export interface ScoringUnitResult {
   readonly unitIndex: number;
-  readonly championshipCountryId: string;
+  readonly championshipClubId: string;
   /** Sum of the raw points of every rider in the unit. */
   readonly rawPoints: Decimal;
   readonly timeSeconds: Decimal | null;
@@ -67,13 +67,13 @@ export interface ScoringUnitResult {
   readonly isComplete: boolean;
 }
 
-export interface CountryRunResult {
-  readonly championshipCountryId: string;
-  /** Sum of the individual contributions of the country's riders. */
+export interface ClubRunResult {
+  readonly championshipClubId: string;
+  /** Sum of the individual contributions of the club's riders. */
   readonly riderPointsTotal: Decimal;
-  /** Penalty attributed to the country (pair, team and relay events only). */
-  readonly countryPenaltyTotal: Decimal;
-  /** `riderPointsTotal + countryPenaltyTotal`. */
+  /** Penalty attributed to the club (pair, team and relay events only). */
+  readonly clubPenaltyTotal: Decimal;
+  /** `riderPointsTotal + clubPenaltyTotal`. */
   readonly total: Decimal;
 }
 
@@ -82,7 +82,7 @@ export interface RunScoringResult {
   readonly definition: EventTypeDefinition;
   readonly units: readonly ScoringUnitResult[];
   readonly riders: readonly RiderRunResult[];
-  readonly countries: readonly CountryRunResult[];
+  readonly clubs: readonly ClubRunResult[];
   /** True when every unit has a time and every target has a value. */
   readonly isComplete: boolean;
 }
@@ -104,7 +104,7 @@ function sumTargets(targets: readonly (Numeric | null)[]): {
 }
 
 /**
- * Scores one run of one event for every participating country.
+ * Scores one run of one event for every participating club.
  *
  * This is a pure function: it reads only its input and returns a fresh result,
  * so it can be unit tested against the reference workbook without a database.
@@ -117,8 +117,8 @@ export function scoreRun(input: RunScoringInput): RunScoringResult {
 
   const unitResults: ScoringUnitResult[] = [];
   const riderResults: RiderRunResult[] = [];
-  const countryRiderPoints = new Map<string, Decimal>();
-  const countryPenalties = new Map<string, Decimal>();
+  const clubRiderPoints = new Map<string, Decimal>();
+  const clubPenalties = new Map<string, Decimal>();
   let allComplete = true;
 
   for (const unit of input.units) {
@@ -147,7 +147,7 @@ export function scoreRun(input: RunScoringInput): RunScoringResult {
 
     unitResults.push({
       unitIndex: unit.unitIndex,
-      championshipCountryId: unit.championshipCountryId,
+      championshipClubId: unit.championshipClubId,
       rawPoints: unitRawPoints,
       timeSeconds: hasTime ? dec(unit.timeSeconds as Numeric) : null,
       penalty,
@@ -158,45 +158,45 @@ export function scoreRun(input: RunScoringInput): RunScoringResult {
 
     for (const entry of riderRaw) {
       // A rider-attributed penalty belongs to a unit of exactly one rider, so
-      // the whole penalty lands on that rider. A country-attributed penalty is
-      // kept off the rider and added once to the country total below.
+      // the whole penalty lands on that rider. A club-attributed penalty is
+      // kept off the rider and added once to the club total below.
       const riderPenalty = attribution === "RIDER" ? penalty : ZERO;
       const netPoints = entry.total.plus(riderPenalty);
 
       riderResults.push({
         championshipRiderId: entry.rider.championshipRiderId,
-        championshipCountryId: unit.championshipCountryId,
+        championshipClubId: unit.championshipClubId,
         unitIndex: unit.unitIndex,
         positionInUnit: entry.rider.positionInUnit,
         rawPoints: entry.total,
         netPoints,
         individualContribution: netPoints,
-        isComplete: entry.isComplete && (attribution === "COUNTRY" || hasTime),
+        isComplete: entry.isComplete && (attribution === "CLUB" || hasTime),
       });
 
-      countryRiderPoints.set(
-        unit.championshipCountryId,
-        (countryRiderPoints.get(unit.championshipCountryId) ?? ZERO).plus(netPoints),
+      clubRiderPoints.set(
+        unit.championshipClubId,
+        (clubRiderPoints.get(unit.championshipClubId) ?? ZERO).plus(netPoints),
       );
     }
 
-    if (attribution === "COUNTRY") {
-      countryPenalties.set(
-        unit.championshipCountryId,
-        (countryPenalties.get(unit.championshipCountryId) ?? ZERO).plus(penalty),
+    if (attribution === "CLUB") {
+      clubPenalties.set(
+        unit.championshipClubId,
+        (clubPenalties.get(unit.championshipClubId) ?? ZERO).plus(penalty),
       );
     }
   }
 
-  const countryIds = new Set<string>([...countryRiderPoints.keys(), ...countryPenalties.keys()]);
-  const countries: CountryRunResult[] = [...countryIds].map((championshipCountryId) => {
-    const riderPointsTotal = countryRiderPoints.get(championshipCountryId) ?? ZERO;
-    const countryPenaltyTotal = countryPenalties.get(championshipCountryId) ?? ZERO;
+  const clubIds = new Set<string>([...clubRiderPoints.keys(), ...clubPenalties.keys()]);
+  const clubs: ClubRunResult[] = [...clubIds].map((championshipClubId) => {
+    const riderPointsTotal = clubRiderPoints.get(championshipClubId) ?? ZERO;
+    const clubPenaltyTotal = clubPenalties.get(championshipClubId) ?? ZERO;
     return {
-      championshipCountryId,
+      championshipClubId,
       riderPointsTotal,
-      countryPenaltyTotal,
-      total: riderPointsTotal.plus(countryPenaltyTotal),
+      clubPenaltyTotal,
+      total: riderPointsTotal.plus(clubPenaltyTotal),
     };
   });
 
@@ -205,22 +205,22 @@ export function scoreRun(input: RunScoringInput): RunScoringResult {
     definition,
     units: unitResults,
     riders: riderResults,
-    countries,
+    clubs,
     isComplete: allComplete && input.units.length > 0,
   };
 }
 
-/** Sums several run results into one event result, per rider and per country. */
+/** Sums several run results into one event result, per rider and per club. */
 export interface EventAggregate {
   readonly riderTotals: ReadonlyMap<string, Decimal>;
-  readonly countryRiderTotals: ReadonlyMap<string, Decimal>;
-  readonly countryPenaltyTotals: ReadonlyMap<string, Decimal>;
+  readonly clubRiderTotals: ReadonlyMap<string, Decimal>;
+  readonly clubPenaltyTotals: ReadonlyMap<string, Decimal>;
 }
 
 export function aggregateRuns(results: readonly RunScoringResult[]): EventAggregate {
   const riderTotals = new Map<string, Decimal>();
-  const countryRiderTotals = new Map<string, Decimal>();
-  const countryPenaltyTotals = new Map<string, Decimal>();
+  const clubRiderTotals = new Map<string, Decimal>();
+  const clubPenaltyTotals = new Map<string, Decimal>();
 
   for (const result of results) {
     for (const rider of result.riders) {
@@ -229,21 +229,21 @@ export function aggregateRuns(results: readonly RunScoringResult[]): EventAggreg
         (riderTotals.get(rider.championshipRiderId) ?? ZERO).plus(rider.individualContribution),
       );
     }
-    for (const country of result.countries) {
-      countryRiderTotals.set(
-        country.championshipCountryId,
-        (countryRiderTotals.get(country.championshipCountryId) ?? ZERO).plus(
-          country.riderPointsTotal,
+    for (const club of result.clubs) {
+      clubRiderTotals.set(
+        club.championshipClubId,
+        (clubRiderTotals.get(club.championshipClubId) ?? ZERO).plus(
+          club.riderPointsTotal,
         ),
       );
-      countryPenaltyTotals.set(
-        country.championshipCountryId,
-        (countryPenaltyTotals.get(country.championshipCountryId) ?? ZERO).plus(
-          country.countryPenaltyTotal,
+      clubPenaltyTotals.set(
+        club.championshipClubId,
+        (clubPenaltyTotals.get(club.championshipClubId) ?? ZERO).plus(
+          club.clubPenaltyTotal,
         ),
       );
     }
   }
 
-  return { riderTotals, countryRiderTotals, countryPenaltyTotals };
+  return { riderTotals, clubRiderTotals, clubPenaltyTotals };
 }

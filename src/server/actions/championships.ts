@@ -4,14 +4,14 @@ import { revalidatePath } from "next/cache";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db";
-import { championshipCountries, championshipRiders, championships } from "@/db/schema";
+import { championshipClubs, championshipRiders, championships } from "@/db/schema";
 import { requireAdmin, requirePermission } from "@/lib/auth/authorize";
-import { ACTIVE_RIDERS_PER_COUNTRY } from "@/domain/scoring/event-types";
+import { ACTIVE_RIDERS_PER_CLUB } from "@/domain/scoring/event-types";
 import { recordAudit } from "@/server/services/audit";
 import {
   createChampionshipFromTemplate,
   deleteChampionship,
-  reorderChampionshipCountries,
+  reorderChampionshipClubs,
   replaceSquad,
   type SquadInput,
 } from "@/server/services/championship-setup";
@@ -20,7 +20,7 @@ import { DomainError, ok, run, type ActionResult } from "./result";
 const squadRiderSchema = z.object({
   riderId: z.uuid(),
   rosterSlot: z.enum(["ACTIVE", "RESERVE"]),
-  initialOrder: z.number().int().min(1).max(ACTIVE_RIDERS_PER_COUNTRY).nullable(),
+  initialOrder: z.number().int().min(1).max(ACTIVE_RIDERS_PER_CLUB).nullable(),
 });
 
 /**
@@ -30,7 +30,7 @@ const squadRiderSchema = z.object({
  * the upper bound are checked.
  */
 const squadSchema = z.object({
-  countryId: z.uuid(),
+  clubId: z.uuid(),
   riders: z.array(squadRiderSchema).max(16),
 });
 
@@ -233,7 +233,7 @@ export async function setChampionshipPublishedAction(
 
 const replaceSquadSchema = z.object({
   championshipId: z.uuid(),
-  championshipCountryId: z.uuid(),
+  championshipClubId: z.uuid(),
   squad: squadSchema,
 });
 
@@ -248,24 +248,24 @@ export async function replaceSquadAction(input: unknown): Promise<ActionResult<u
     await getDb().transaction(async (tx) => {
       const [participant] = await tx
         .select({
-          id: championshipCountries.id,
-          championshipId: championshipCountries.championshipId,
-          countryId: championshipCountries.countryId,
+          id: championshipClubs.id,
+          championshipId: championshipClubs.championshipId,
+          clubId: championshipClubs.clubId,
         })
-        .from(championshipCountries)
-        .where(eq(championshipCountries.id, parsed.data.championshipCountryId))
+        .from(championshipClubs)
+        .where(eq(championshipClubs.id, parsed.data.championshipClubId))
         .limit(1);
 
       if (!participant || participant.championshipId !== parsed.data.championshipId) {
-        throw new DomainError("This country does not take part in this championship.", "NOT_FOUND");
+        throw new DomainError("This club does not take part in this championship.", "NOT_FOUND");
       }
-      if (participant.countryId !== parsed.data.squad.countryId) {
-        throw new DomainError("The squad does not match the country.", "VALIDATION");
+      if (participant.clubId !== parsed.data.squad.clubId) {
+        throw new DomainError("The squad does not match the club.", "VALIDATION");
       }
 
       await replaceSquad(tx, actor, {
         championshipId: parsed.data.championshipId,
-        championshipCountryId: parsed.data.championshipCountryId,
+        championshipClubId: parsed.data.championshipClubId,
         squad: parsed.data.squad as SquadInput,
       });
     });
@@ -275,67 +275,67 @@ export async function replaceSquadAction(input: unknown): Promise<ActionResult<u
   });
 }
 
-const addCountrySchema = z.object({
+const addClubSchema = z.object({
   championshipId: z.uuid(),
   squad: squadSchema,
 });
 
-/** Adds a country and its squad to a championship that is already set up. */
-export async function addChampionshipCountryAction(
+/** Adds a club and its squad to a championship that is already set up. */
+export async function addChampionshipClubAction(
   input: unknown,
 ): Promise<ActionResult<undefined>> {
   return run(async () => {
-    const actor = await requirePermission("MANAGE_CHAMPIONSHIP_COUNTRIES");
-    const parsed = addCountrySchema.safeParse(input);
+    const actor = await requirePermission("MANAGE_CHAMPIONSHIP_CLUBS");
+    const parsed = addClubSchema.safeParse(input);
     if (!parsed.success) {
       throw new DomainError(parsed.error.issues[0]?.message ?? "Invalid squad.", "VALIDATION");
     }
 
     await getDb().transaction(async (tx) => {
       const [clash] = await tx
-        .select({ id: championshipCountries.id })
-        .from(championshipCountries)
+        .select({ id: championshipClubs.id })
+        .from(championshipClubs)
         .where(
           and(
-            eq(championshipCountries.championshipId, parsed.data.championshipId),
-            eq(championshipCountries.countryId, parsed.data.squad.countryId),
+            eq(championshipClubs.championshipId, parsed.data.championshipId),
+            eq(championshipClubs.clubId, parsed.data.squad.clubId),
           ),
         )
         .limit(1);
       if (clash) {
-        throw new DomainError("This country is already taking part.", "CONFLICT");
+        throw new DomainError("This club is already taking part.", "CONFLICT");
       }
 
       // Appended to the end of the current start list.
       const [nextOrder] = await tx
         .select({
-          nextOrderIndex: sql<number>`coalesce(max(${championshipCountries.orderIndex}), -1) + 1`,
+          nextOrderIndex: sql<number>`coalesce(max(${championshipClubs.orderIndex}), -1) + 1`,
         })
-        .from(championshipCountries)
-        .where(eq(championshipCountries.championshipId, parsed.data.championshipId));
+        .from(championshipClubs)
+        .where(eq(championshipClubs.championshipId, parsed.data.championshipId));
 
       const [participant] = await tx
-        .insert(championshipCountries)
+        .insert(championshipClubs)
         .values({
           championshipId: parsed.data.championshipId,
-          countryId: parsed.data.squad.countryId,
+          clubId: parsed.data.squad.clubId,
           orderIndex: nextOrder?.nextOrderIndex ?? 0,
         })
-        .returning({ id: championshipCountries.id });
-      if (!participant) throw new DomainError("The country could not be added.", "UNEXPECTED");
+        .returning({ id: championshipClubs.id });
+      if (!participant) throw new DomainError("The club could not be added.", "UNEXPECTED");
 
       await replaceSquad(tx, actor, {
         championshipId: parsed.data.championshipId,
-        championshipCountryId: participant.id,
+        championshipClubId: participant.id,
         squad: parsed.data.squad as SquadInput,
       });
 
       await recordAudit(tx, actor, {
-        action: "CHAMPIONSHIP_COUNTRY_ADDED",
-        entityType: "championship_country",
+        action: "CHAMPIONSHIP_CLUB_ADDED",
+        entityType: "championship_club",
         entityId: participant.id,
         championshipId: parsed.data.championshipId,
-        after: { countryId: parsed.data.squad.countryId },
+        after: { clubId: parsed.data.squad.clubId },
       });
     });
 
@@ -344,38 +344,38 @@ export async function addChampionshipCountryAction(
   });
 }
 
-const removeCountrySchema = z.object({
+const removeClubSchema = z.object({
   championshipId: z.uuid(),
-  championshipCountryId: z.uuid(),
+  championshipClubId: z.uuid(),
 });
 
 /**
- * Removes a country from a championship.
+ * Removes a club from a championship.
  *
- * Refused once the country has ridden, because removing it would delete the
+ * Refused once the club has ridden, because removing it would delete the
  * participation rows that its confirmed scores reference.
  */
-export async function removeChampionshipCountryAction(
+export async function removeChampionshipClubAction(
   input: unknown,
 ): Promise<ActionResult<undefined>> {
   return run(async () => {
-    const actor = await requirePermission("MANAGE_CHAMPIONSHIP_COUNTRIES");
-    const parsed = removeCountrySchema.safeParse(input);
+    const actor = await requirePermission("MANAGE_CHAMPIONSHIP_CLUBS");
+    const parsed = removeClubSchema.safeParse(input);
     if (!parsed.success) throw new DomainError("Invalid request.", "VALIDATION");
 
     await getDb().transaction(async (tx) => {
       const [participant] = await tx
         .select({
-          id: championshipCountries.id,
-          championshipId: championshipCountries.championshipId,
-          countryId: championshipCountries.countryId,
+          id: championshipClubs.id,
+          championshipId: championshipClubs.championshipId,
+          clubId: championshipClubs.clubId,
         })
-        .from(championshipCountries)
-        .where(eq(championshipCountries.id, parsed.data.championshipCountryId))
+        .from(championshipClubs)
+        .where(eq(championshipClubs.id, parsed.data.championshipClubId))
         .limit(1);
 
       if (!participant || participant.championshipId !== parsed.data.championshipId) {
-        throw new DomainError("This country does not take part in this championship.", "NOT_FOUND");
+        throw new DomainError("This club does not take part in this championship.", "NOT_FOUND");
       }
 
       const [used] = await tx
@@ -383,7 +383,7 @@ export async function removeChampionshipCountryAction(
         .from(championshipRiders)
         .where(
           and(
-            eq(championshipRiders.championshipCountryId, participant.id),
+            eq(championshipRiders.championshipClubId, participant.id),
             sql`exists (
               select 1 from run_scores rs
               where rs.championship_rider_id = championship_riders.id
@@ -393,19 +393,19 @@ export async function removeChampionshipCountryAction(
 
       if ((used?.count ?? 0) > 0) {
         throw new DomainError(
-          "This country has already taken part in a run and cannot be removed.",
+          "This club has already taken part in a run and cannot be removed.",
           "CONFLICT",
         );
       }
 
-      await tx.delete(championshipCountries).where(eq(championshipCountries.id, participant.id));
+      await tx.delete(championshipClubs).where(eq(championshipClubs.id, participant.id));
 
       await recordAudit(tx, actor, {
-        action: "CHAMPIONSHIP_COUNTRY_REMOVED",
-        entityType: "championship_country",
+        action: "CHAMPIONSHIP_CLUB_REMOVED",
+        entityType: "championship_club",
         entityId: participant.id,
         championshipId: parsed.data.championshipId,
-        before: { countryId: participant.countryId },
+        before: { clubId: participant.clubId },
       });
     });
 
@@ -414,28 +414,28 @@ export async function removeChampionshipCountryAction(
   });
 }
 
-const reorderCountriesSchema = z.object({
+const reorderClubsSchema = z.object({
   championshipId: z.uuid(),
-  orderedChampionshipCountryIds: z.array(z.uuid()).min(1).max(64),
+  orderedChampionshipClubIds: z.array(z.uuid()).min(1).max(64),
 });
 
 /**
  * Sets the championship's start list order (team 1, team 2, ...). Refused
  * once the championship's first run has started, enforced again by
- * {@link reorderChampionshipCountries} inside the transaction.
+ * {@link reorderChampionshipClubs} inside the transaction.
  */
-export async function reorderChampionshipCountriesAction(
+export async function reorderChampionshipClubsAction(
   input: unknown,
 ): Promise<ActionResult<undefined>> {
   return run(async () => {
-    const actor = await requirePermission("MANAGE_CHAMPIONSHIP_COUNTRIES");
-    const parsed = reorderCountriesSchema.safeParse(input);
+    const actor = await requirePermission("MANAGE_CHAMPIONSHIP_CLUBS");
+    const parsed = reorderClubsSchema.safeParse(input);
     if (!parsed.success) throw new DomainError("Invalid request.", "VALIDATION");
 
     await getDb().transaction((tx) =>
-      reorderChampionshipCountries(tx, actor, {
+      reorderChampionshipClubs(tx, actor, {
         championshipId: parsed.data.championshipId,
-        orderedChampionshipCountryIds: parsed.data.orderedChampionshipCountryIds,
+        orderedChampionshipClubIds: parsed.data.orderedChampionshipClubIds,
       }),
     );
 

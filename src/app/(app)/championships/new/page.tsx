@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LayoutTemplate } from "lucide-react";
 import { requirePagePermission } from "@/lib/auth/page-guards";
 import { getTranslator } from "@/lib/i18n/server";
-import { listCountriesWithRiderCounts } from "@/server/services/registry";
+import { listClubsWithRiderCounts } from "@/server/services/registry";
 import { getTemplateDetail, listTemplates, type TemplateDetail } from "@/server/services/templates";
 import { Button } from "@/components/ui/button";
 import { EmptyState, PageHeader } from "@/components/ui/surfaces";
@@ -41,11 +41,10 @@ export default async function NewChampionshipPage() {
     })),
   }));
 
-  const countries = (await listCountriesWithRiderCounts(locale)).map((country) => ({
-    id: country.id,
-    iso2: country.iso2,
-    name: country.name,
-    riderCount: country.riderCount,
+  const clubs = (await listClubsWithRiderCounts(locale)).map((club) => ({
+    id: club.id,
+    name: club.name,
+    riderCount: club.riderCount,
   }));
 
   return (
@@ -67,7 +66,7 @@ export default async function NewChampionshipPage() {
           }
         />
       ) : (
-        <ChampionshipWizard templates={templates} countries={countries} />
+        <ChampionshipWizard templates={templates} clubs={clubs} />
       )}
     </>
   );

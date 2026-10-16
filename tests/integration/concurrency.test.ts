@@ -38,32 +38,32 @@ suite("concurrency and data integrity", () => {
   }
 
   /**
-   * Two operators confirming the last two countries at the same moment each
+   * Two operators confirming the last two clubs at the same moment each
    * commit without seeing the other, so neither observes the run becoming
    * complete. The run must still be startable.
    */
-  it("starts a run whose countries were confirmed in concurrent transactions", async () => {
+  it("starts a run whose clubs were confirmed in concurrent transactions", async () => {
     const { runId } = await setUp();
-    const { getRunEntryOrderState, confirmCountryEntryOrder, startRun } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder, startRun } = await import(
       "@/server/services/runs"
     );
     const { getRunContext } = await import("@/server/services/championships");
 
     const state = await getRunEntryOrderState(runId, "en");
-    const [first, second] = state!.countries;
+    const [first, second] = state!.clubs;
 
     await Promise.all([
       db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: first!.championshipCountryId,
+          championshipClubId: first!.championshipClubId,
           decision: "NO_CHANGE",
         }),
       ),
       db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: second!.championshipCountryId,
+          championshipClubId: second!.championshipClubId,
           decision: "NO_CHANGE",
         }),
       ),
@@ -79,18 +79,18 @@ suite("concurrency and data integrity", () => {
     expect(started.status).toBe("IN_PROGRESS");
   });
 
-  it("refuses to start a run while a country is still unreviewed", async () => {
+  it("refuses to start a run while a club is still unreviewed", async () => {
     const { runId } = await setUp();
-    const { getRunEntryOrderState, confirmCountryEntryOrder, startRun } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder, startRun } = await import(
       "@/server/services/runs"
     );
     const { getRunContext } = await import("@/server/services/championships");
 
     const state = await getRunEntryOrderState(runId, "en");
     await db.transaction((tx) =>
-      confirmCountryEntryOrder(tx, actor, {
+      confirmClubEntryOrder(tx, actor, {
         runId,
-        championshipCountryId: state!.countries[0]!.championshipCountryId,
+        championshipClubId: state!.clubs[0]!.championshipClubId,
         decision: "NO_CHANGE",
       }),
     );
@@ -101,83 +101,83 @@ suite("concurrency and data integrity", () => {
     ).rejects.toThrow(/must confirm its entry order/i);
   });
 
-  it("lets a country be re-reviewed before the run starts, replacing its order", async () => {
+  it("lets a club be re-reviewed before the run starts, replacing its order", async () => {
     const { runId } = await setUp();
-    const { getRunEntryOrderState, confirmCountryEntryOrder, getRunScoringState } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder, getRunScoringState } = await import(
       "@/server/services/runs"
     );
 
     const state = await getRunEntryOrderState(runId, "en");
-    const country = state!.countries[0]!;
-    const active = country.roster
+    const club = state!.clubs[0]!;
+    const active = club.roster
       .filter((member) => member.rosterSlot === "ACTIVE")
       .map((member) => member.championshipRiderId);
 
     await db.transaction((tx) =>
-      confirmCountryEntryOrder(tx, actor, {
+      confirmClubEntryOrder(tx, actor, {
         runId,
-        championshipCountryId: country.championshipCountryId,
+        championshipClubId: club.championshipClubId,
         decision: "NO_CHANGE",
       }),
     );
 
     const reversed = [...active].reverse();
     await db.transaction((tx) =>
-      confirmCountryEntryOrder(tx, actor, {
+      confirmClubEntryOrder(tx, actor, {
         runId,
-        championshipCountryId: country.championshipCountryId,
+        championshipClubId: club.championshipClubId,
         decision: "CHANGED",
         order: reversed,
       }),
     );
 
     const after = await getRunEntryOrderState(runId, "en");
-    const updated = after!.countries.find(
-      (entry) => entry.championshipCountryId === country.championshipCountryId,
+    const updated = after!.clubs.find(
+      (entry) => entry.championshipClubId === club.championshipClubId,
     )!;
     expect(updated.confirmedOrder).toEqual(reversed);
 
     // Re-confirming replaces the empty score rows rather than duplicating them.
     const scoring = await getRunScoringState(runId, "en");
-    const scored = scoring!.countries.find(
-      (entry) => entry.championshipCountryId === country.championshipCountryId,
+    const scored = scoring!.clubs.find(
+      (entry) => entry.championshipClubId === club.championshipClubId,
     )!;
     expect(scored.units).toHaveLength(4);
     expect(scored.units.map((unit) => unit.riders[0]!.championshipRiderId)).toEqual(reversed);
   });
 
-  it("rejects a duplicate country in the same championship", async () => {
-    const { championshipId, countryIds } = await setUp();
-    const { championshipCountries } = await import("@/db/schema");
+  it("rejects a duplicate club in the same championship", async () => {
+    const { championshipId, clubIds } = await setUp();
+    const { championshipClubs } = await import("@/db/schema");
 
     await expect(
       db
-        .insert(championshipCountries)
-        .values({ championshipId, countryId: countryIds[0]!, orderIndex: 99 }),
+        .insert(championshipClubs)
+        .values({ championshipId, clubId: clubIds[0]!, orderIndex: 99 }),
     ).rejects.toThrow();
   });
 
   it("rejects a score outside the allowed set at the database level", async () => {
     const { runId } = await setUp();
-    const { getRunEntryOrderState, confirmCountryEntryOrder, getRunScoringState } = await import(
+    const { getRunEntryOrderState, confirmClubEntryOrder, getRunScoringState } = await import(
       "@/server/services/runs"
     );
     const { runScoreTargets } = await import("@/db/schema");
     const { and, eq } = await import("drizzle-orm");
 
     const state = await getRunEntryOrderState(runId, "en");
-    for (const country of state!.countries) {
+    for (const club of state!.clubs) {
       await db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: country.championshipCountryId,
+          championshipClubId: club.championshipClubId,
           decision: "NO_CHANGE",
         }),
       );
     }
 
     const scoring = await getRunScoringState(runId, "en");
-    const scoreId = scoring!.countries[0]!.units[0]!.riders[0]!.runScoreId;
+    const scoreId = scoring!.clubs[0]!.units[0]!.riders[0]!.runScoreId;
 
     await expect(
       db
@@ -196,15 +196,15 @@ suite("concurrency and data integrity", () => {
     const { createChampionshipFromTemplate } = await import(
       "@/server/services/championship-setup"
     );
-    const { countryIdByIso, createSquadRiders } = await import("../helpers/fixtures");
+    const { clubIdByName, createSquadRiders } = await import("../helpers/fixtures");
 
-    const jordan = await countryIdByIso("JO");
-    const oman = await countryIdByIso("OM");
+    const jordan = await clubIdByName("JO");
+    const oman = await clubIdByName("OM");
     const jordanRiders = await createSquadRiders(jordan, "JO");
     const omanRiders = await createSquadRiders(oman, "OM");
 
-    const goodSquad = (countryId: string, riderIds: readonly string[]) => ({
-      countryId,
+    const goodSquad = (clubId: string, riderIds: readonly string[]) => ({
+      clubId,
       riders: riderIds.map((riderId, index) => ({
         riderId,
         rosterSlot: index < 4 ? ("ACTIVE" as const) : ("RESERVE" as const),
@@ -224,7 +224,7 @@ suite("concurrency and data integrity", () => {
           organizer: null,
           squads: [
             {
-              countryId: jordan,
+              clubId: jordan,
               riders: jordanRiders.slice(0, 4).map((riderId, index) => ({
                 riderId,
                 rosterSlot: index < 3 ? ("ACTIVE" as const) : ("RESERVE" as const),
@@ -237,7 +237,7 @@ suite("concurrency and data integrity", () => {
       ),
     ).rejects.toThrow(/exactly 4 active riders/i);
 
-    // A single country is not a competition.
+    // A single club is not a competition.
     await expect(
       db.transaction((tx) =>
         createChampionshipFromTemplate(tx, actor, {
@@ -252,7 +252,7 @@ suite("concurrency and data integrity", () => {
       ),
     ).rejects.toThrow(/at least two/i);
 
-    // A rider entered under a country they do not belong to.
+    // A rider entered under a club they do not belong to.
     await expect(
       db.transaction((tx) =>
         createChampionshipFromTemplate(tx, actor, {
@@ -268,26 +268,26 @@ suite("concurrency and data integrity", () => {
           ],
         }),
       ),
-    ).rejects.toThrow(/not registered under this country/i);
+    ).rejects.toThrow(/not registered under this club/i);
   });
 
-  it("keeps a rider registry name unique within a country", async () => {
+  it("keeps a rider registry name unique within a club", async () => {
     const { createRider } = await import("@/server/services/registry");
-    const { countryIdByIso } = await import("../helpers/fixtures");
-    const jordan = await countryIdByIso("JO");
+    const { clubIdByName } = await import("../helpers/fixtures");
+    const jordan = await clubIdByName("JO");
 
-    await db.transaction((tx) => createRider(tx, { countryId: jordan, fullName: "Sami Khalid" }));
+    await db.transaction((tx) => createRider(tx, { clubId: jordan, fullName: "Sami Khalid" }));
 
     await expect(
       db.transaction((tx) =>
-        createRider(tx, { countryId: jordan, fullName: "  sami   khalid  " }),
+        createRider(tx, { clubId: jordan, fullName: "  sami   khalid  " }),
       ),
     ).rejects.toThrow(/already exists/i);
 
-    // The same name under a different country is a different person.
-    const oman = await countryIdByIso("OM");
+    // The same name under a different club is a different person.
+    const oman = await clubIdByName("OM");
     const created = await db.transaction((tx) =>
-      createRider(tx, { countryId: oman, fullName: "Sami Khalid" }),
+      createRider(tx, { clubId: oman, fullName: "Sami Khalid" }),
     );
     expect(created.fullName).toBe("Sami Khalid");
   });

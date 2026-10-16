@@ -45,7 +45,7 @@ export function PublicStandings({
 
   const subjectOptions: readonly ToggleOption<StandingsSubject>[] = [
     { value: "INDIVIDUAL", label: t("results.individual") },
-    { value: "COUNTRY", label: t("results.countries") },
+    { value: "CLUB", label: t("results.clubs") },
   ];
   const scopeOptions: readonly ToggleOption<StandingsScope>[] = scopes.map((value) => ({
     value,
@@ -58,8 +58,8 @@ export function PublicStandings({
     <Card>
       <CardHeader className="flex-col items-start gap-3">
         <CardTitle className="text-base">
-          {subject === "COUNTRY"
-            ? t("publicResults.countryStandings")
+          {subject === "CLUB"
+            ? t("publicResults.clubStandings")
             : t("publicResults.individualStandings")}
         </CardTitle>
         <div className="flex flex-wrap items-center gap-2">

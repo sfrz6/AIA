@@ -14,14 +14,14 @@ import {
 import { entryOrderDecisionEnum, standingsScopeEnum, standingsSubjectEnum } from "./enums";
 import { users } from "./identity";
 import {
-  championshipCountries,
+  championshipClubs,
   championshipRiders,
   championshipRuns,
   championships,
 } from "./championships";
 
 /**
- * A country's confirmed entry order for one run.
+ * A club's confirmed entry order for one run.
  *
  * The official change request happens on paper before the run. The operator
  * records the outcome here: either the previous order carries over unchanged,
@@ -35,9 +35,9 @@ export const runEntryOrders = pgTable(
     runId: uuid("run_id")
       .notNull()
       .references(() => championshipRuns.id, { onDelete: "cascade" }),
-    championshipCountryId: uuid("championship_country_id")
+    championshipClubId: uuid("championship_club_id")
       .notNull()
-      .references(() => championshipCountries.id, { onDelete: "cascade" }),
+      .references(() => championshipClubs.id, { onDelete: "cascade" }),
     decision: entryOrderDecisionEnum("decision").notNull(),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().defaultNow(),
     confirmedByUserId: uuid("confirmed_by_user_id").references(() => users.id, {
@@ -45,7 +45,7 @@ export const runEntryOrders = pgTable(
     }),
   },
   (table) => [
-    uniqueIndex("run_entry_orders_unique_idx").on(table.runId, table.championshipCountryId),
+    uniqueIndex("run_entry_orders_unique_idx").on(table.runId, table.championshipClubId),
     index("run_entry_orders_run_idx").on(table.runId),
   ],
 );
@@ -83,10 +83,10 @@ export const runScoringUnits = pgTable(
     runId: uuid("run_id")
       .notNull()
       .references(() => championshipRuns.id, { onDelete: "cascade" }),
-    championshipCountryId: uuid("championship_country_id")
+    championshipClubId: uuid("championship_club_id")
       .notNull()
-      .references(() => championshipCountries.id, { onDelete: "cascade" }),
-    /** 0-based index of the unit inside the country for this run. */
+      .references(() => championshipClubs.id, { onDelete: "cascade" }),
+    /** 0-based index of the unit inside the club for this run. */
     unitIndex: integer("unit_index").notNull(),
     timeSeconds: numeric("time_seconds", { precision: 6, scale: 2 }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -94,7 +94,7 @@ export const runScoringUnits = pgTable(
   (table) => [
     uniqueIndex("run_scoring_units_unique_idx").on(
       table.runId,
-      table.championshipCountryId,
+      table.championshipClubId,
       table.unitIndex,
     ),
     index("run_scoring_units_run_idx").on(table.runId),
@@ -190,7 +190,7 @@ export const runRevisions = pgTable(
 
 /**
  * A tie-break round, called a round of draws in the reference workbook. It is
- * ridden at a reduced peg size to separate competitors or countries that are
+ * ridden at a reduced peg size to separate competitors or clubs that are
  * level on points.
  */
 export const tieBreakRounds = pgTable(
@@ -228,13 +228,13 @@ export const tieBreakEntries = pgTable(
     tieBreakRoundId: uuid("tie_break_round_id")
       .notNull()
       .references(() => tieBreakRounds.id, { onDelete: "cascade" }),
-    /** Set for an individual tie-break, null for a country tie-break. */
+    /** Set for an individual tie-break, null for a club tie-break. */
     championshipRiderId: uuid("championship_rider_id").references(() => championshipRiders.id, {
       onDelete: "cascade",
     }),
-    /** Set for a country tie-break, null for an individual tie-break. */
-    championshipCountryId: uuid("championship_country_id").references(
-      () => championshipCountries.id,
+    /** Set for a club tie-break, null for an individual tie-break. */
+    championshipClubId: uuid("championship_club_id").references(
+      () => championshipClubs.id,
       { onDelete: "cascade" },
     ),
     timeSeconds: numeric("time_seconds", { precision: 6, scale: 2 }).notNull(),
@@ -244,12 +244,12 @@ export const tieBreakEntries = pgTable(
     uniqueIndex("tie_break_entries_rider_idx")
       .on(table.tieBreakRoundId, table.championshipRiderId)
       .where(sql`${table.championshipRiderId} is not null`),
-    uniqueIndex("tie_break_entries_country_idx")
-      .on(table.tieBreakRoundId, table.championshipCountryId)
-      .where(sql`${table.championshipCountryId} is not null`),
+    uniqueIndex("tie_break_entries_club_idx")
+      .on(table.tieBreakRoundId, table.championshipClubId)
+      .where(sql`${table.championshipClubId} is not null`),
     check(
       "tie_break_entries_subject_check",
-      sql`(${table.championshipRiderId} is not null) <> (${table.championshipCountryId} is not null)`,
+      sql`(${table.championshipRiderId} is not null) <> (${table.championshipClubId} is not null)`,
     ),
     check("tie_break_entries_time_check", sql`${table.timeSeconds} >= 0`),
   ],
@@ -257,7 +257,7 @@ export const tieBreakEntries = pgTable(
 
 /**
  * Points scored in a tie-break round. An individual round has one row; a
- * country round has one row per rider taking part in the draw.
+ * club round has one row per rider taking part in the draw.
  */
 export const tieBreakEntryScores = pgTable(
   "tie_break_entry_scores",
@@ -288,9 +288,9 @@ export const runEntryOrdersRelations = relations(runEntryOrders, ({ one, many })
     fields: [runEntryOrders.runId],
     references: [championshipRuns.id],
   }),
-  championshipCountry: one(championshipCountries, {
-    fields: [runEntryOrders.championshipCountryId],
-    references: [championshipCountries.id],
+  championshipClub: one(championshipClubs, {
+    fields: [runEntryOrders.championshipClubId],
+    references: [championshipClubs.id],
   }),
   items: many(runEntryOrderItems),
 }));
@@ -311,9 +311,9 @@ export const runScoringUnitsRelations = relations(runScoringUnits, ({ one, many 
     fields: [runScoringUnits.runId],
     references: [championshipRuns.id],
   }),
-  championshipCountry: one(championshipCountries, {
-    fields: [runScoringUnits.championshipCountryId],
-    references: [championshipCountries.id],
+  championshipClub: one(championshipClubs, {
+    fields: [runScoringUnits.championshipClubId],
+    references: [championshipClubs.id],
   }),
   scores: many(runScores),
 }));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dec, ZERO } from "@/domain/scoring/decimal";
-import type { ChampionshipTotals, CountryTotals, DayNumber } from "@/domain/results";
+import type { ChampionshipTotals, ClubTotals, DayNumber } from "@/domain/results";
 import type { Decimal } from "@/domain/scoring/decimal";
 import { buildStandingsData, pdfAvailability } from "@/components/results/standings-data";
 import type {
@@ -14,12 +14,12 @@ import type { Translator } from "@/lib/i18n";
 
 const t: Translator = ((key: string) => key) as Translator;
 
-function countryTotals(dayOneTotal: number, hasDayTwo: boolean): CountryTotals {
+function clubTotals(dayOneTotal: number, hasDayTwo: boolean): ClubTotals {
   const byDay = new Map<DayNumber, Decimal>([[1, dec(dayOneTotal)]]);
   if (hasDayTwo) byDay.set(2, dec(5));
   const overall = hasDayTwo ? dec(dayOneTotal).plus(5) : dec(dayOneTotal);
   return {
-    championshipCountryId: "placeholder",
+    championshipClubId: "placeholder",
     riderPointsByDay: byDay,
     penaltiesByDay: new Map(),
     byDay,
@@ -29,24 +29,24 @@ function countryTotals(dayOneTotal: number, hasDayTwo: boolean): CountryTotals {
   };
 }
 
-function directoryOf(countryIds: readonly string[]): ChampionshipParticipantDirectory {
-  const countries = new Map(
-    countryIds.map((id) => [
+function directoryOf(clubIds: readonly string[]): ChampionshipParticipantDirectory {
+  const clubs = new Map(
+    clubIds.map((id) => [
       id,
-      { championshipCountryId: id, iso2: id.slice(0, 2).toUpperCase(), iso3: "XXX", countryName: id },
+      { championshipClubId: id, iso2: id.slice(0, 2).toUpperCase(), iso3: "XXX", clubName: id },
     ]),
   );
-  return { riders: new Map(), countries };
+  return { riders: new Map(), clubs };
 }
 
 describe("buildStandingsData — cross-scope tie-break reuse", () => {
   it("applies an Overall tie-break to Day 1 when Day 1 is the only day played and the totals match exactly", () => {
     const totals: ChampionshipTotals = {
       riders: new Map(),
-      countries: new Map([
-        ["a", { ...countryTotals(100, false), championshipCountryId: "a" }],
-        ["b", { ...countryTotals(100, false), championshipCountryId: "b" }],
-        ["c", { ...countryTotals(50, false), championshipCountryId: "c" }],
+      clubs: new Map([
+        ["a", { ...clubTotals(100, false), championshipClubId: "a" }],
+        ["b", { ...clubTotals(100, false), championshipClubId: "b" }],
+        ["c", { ...clubTotals(50, false), championshipClubId: "c" }],
       ]),
       runResults: new Map(),
       daysWithResults: [1],
@@ -54,11 +54,11 @@ describe("buildStandingsData — cross-scope tie-break reuse", () => {
 
     const tieBreaks = new Map<TieBreakKey, StoredTieBreakRound>([
       [
-        "OVERALL:COUNTRY",
+        "OVERALL:CLUB",
         {
           id: "round-1",
           scope: "OVERALL",
-          subject: "COUNTRY",
+          subject: "CLUB",
           pegSizeCm: "4",
           timeLimitSeconds: 10,
           maxPoints: 6,
@@ -79,22 +79,22 @@ describe("buildStandingsData — cross-scope tie-break reuse", () => {
 
     const { sets } = buildStandingsData(results, t);
 
-    const day1Countries = sets.find((set) => set.scope === "DAY_1" && set.subject === "COUNTRY")!;
-    const overallCountries = sets.find((set) => set.scope === "OVERALL" && set.subject === "COUNTRY")!;
+    const day1Clubs = sets.find((set) => set.scope === "DAY_1" && set.subject === "CLUB")!;
+    const overallClubs = sets.find((set) => set.scope === "OVERALL" && set.subject === "CLUB")!;
 
     // Overall resolves directly, as before.
-    expect(overallCountries.hasUnresolvedTie).toBe(false);
-    const overallA = overallCountries.rows.find((row) => row.key === "a")!;
-    const overallB = overallCountries.rows.find((row) => row.key === "b")!;
+    expect(overallClubs.hasUnresolvedTie).toBe(false);
+    const overallA = overallClubs.rows.find((row) => row.key === "a")!;
+    const overallB = overallClubs.rows.find((row) => row.key === "b")!;
     expect(overallA.rank).toBe(1);
     expect(overallB.rank).toBe(2);
 
     // Day 1 — which was never directly given a tie-break round — is resolved
-    // too, because its tie is identical (same two countries, same total) to
+    // too, because its tie is identical (same two clubs, same total) to
     // the one Overall's round was recorded for.
-    expect(day1Countries.hasUnresolvedTie).toBe(false);
-    const day1A = day1Countries.rows.find((row) => row.key === "a")!;
-    const day1B = day1Countries.rows.find((row) => row.key === "b")!;
+    expect(day1Clubs.hasUnresolvedTie).toBe(false);
+    const day1A = day1Clubs.rows.find((row) => row.key === "a")!;
+    const day1B = day1Clubs.rows.find((row) => row.key === "b")!;
     expect(day1A.rank).toBe(1);
     expect(day1B.rank).toBe(2);
   });
@@ -102,24 +102,24 @@ describe("buildStandingsData — cross-scope tie-break reuse", () => {
   it("does not reuse a tie-break once a later day changes the Overall total away from Day 1's", () => {
     const totals: ChampionshipTotals = {
       riders: new Map(),
-      countries: new Map([
-        ["a", { ...countryTotals(100, true), championshipCountryId: "a" }],
-        ["b", { ...countryTotals(100, false), championshipCountryId: "b" }],
-        ["c", { ...countryTotals(50, false), championshipCountryId: "c" }],
+      clubs: new Map([
+        ["a", { ...clubTotals(100, true), championshipClubId: "a" }],
+        ["b", { ...clubTotals(100, false), championshipClubId: "b" }],
+        ["c", { ...clubTotals(50, false), championshipClubId: "c" }],
       ]),
       runResults: new Map(),
       daysWithResults: [1, 2],
     };
 
-    // Recorded for Day 1's tie (a vs b, both at 100). Country "a" has since
+    // Recorded for Day 1's tie (a vs b, both at 100). Club "a" has since
     // scored more on Day 2, so Overall is no longer the same tie.
     const tieBreaks = new Map<TieBreakKey, StoredTieBreakRound>([
       [
-        "DAY_1:COUNTRY",
+        "DAY_1:CLUB",
         {
           id: "round-1",
           scope: "DAY_1",
-          subject: "COUNTRY",
+          subject: "CLUB",
           pegSizeCm: "4",
           timeLimitSeconds: 10,
           maxPoints: 6,
@@ -140,17 +140,17 @@ describe("buildStandingsData — cross-scope tie-break reuse", () => {
 
     const { sets } = buildStandingsData(results, t);
 
-    const day1Countries = sets.find((set) => set.scope === "DAY_1" && set.subject === "COUNTRY")!;
-    const overallCountries = sets.find((set) => set.scope === "OVERALL" && set.subject === "COUNTRY")!;
+    const day1Clubs = sets.find((set) => set.scope === "DAY_1" && set.subject === "CLUB")!;
+    const overallClubs = sets.find((set) => set.scope === "OVERALL" && set.subject === "CLUB")!;
 
     // Day 1's own round still resolves Day 1 directly.
-    expect(day1Countries.hasUnresolvedTie).toBe(false);
+    expect(day1Clubs.hasUnresolvedTie).toBe(false);
 
     // Overall is a different, untied situation now (a: 105, b: 100), so no
     // tie exists there at all — nothing to misapply the old round to.
-    expect(overallCountries.hasUnresolvedTie).toBe(false);
-    const overallA = overallCountries.rows.find((row) => row.key === "a")!;
-    const overallB = overallCountries.rows.find((row) => row.key === "b")!;
+    expect(overallClubs.hasUnresolvedTie).toBe(false);
+    const overallA = overallClubs.rows.find((row) => row.key === "a")!;
+    const overallB = overallClubs.rows.find((row) => row.key === "b")!;
     expect(overallA.rank).toBe(1);
     expect(overallB.rank).toBe(2);
   });
@@ -203,17 +203,17 @@ describe("pdfAvailability", () => {
 
 describe("buildStandingsData — a direct tie-break round always applies", () => {
   it("resolves two separate ties in the same scope from one combined round", () => {
-    // Country standings: {a,b} tied at 100, {d,e} tied at 80, c alone at 50.
+    // Club standings: {a,b} tied at 100, {d,e} tied at 80, c alone at 50.
     // The tie-break dialog groups every tied row in a scope into one round,
     // so this round's entries cover both pairs at once.
     const totals: ChampionshipTotals = {
       riders: new Map(),
-      countries: new Map([
-        ["a", { ...countryTotals(100, false), championshipCountryId: "a" }],
-        ["b", { ...countryTotals(100, false), championshipCountryId: "b" }],
-        ["c", { ...countryTotals(50, false), championshipCountryId: "c" }],
-        ["d", { ...countryTotals(80, false), championshipCountryId: "d" }],
-        ["e", { ...countryTotals(80, false), championshipCountryId: "e" }],
+      clubs: new Map([
+        ["a", { ...clubTotals(100, false), championshipClubId: "a" }],
+        ["b", { ...clubTotals(100, false), championshipClubId: "b" }],
+        ["c", { ...clubTotals(50, false), championshipClubId: "c" }],
+        ["d", { ...clubTotals(80, false), championshipClubId: "d" }],
+        ["e", { ...clubTotals(80, false), championshipClubId: "e" }],
       ]),
       runResults: new Map(),
       daysWithResults: [1],
@@ -221,11 +221,11 @@ describe("buildStandingsData — a direct tie-break round always applies", () =>
 
     const tieBreaks = new Map<TieBreakKey, StoredTieBreakRound>([
       [
-        "DAY_1:COUNTRY",
+        "DAY_1:CLUB",
         {
           id: "round-1",
           scope: "DAY_1",
-          subject: "COUNTRY",
+          subject: "CLUB",
           pegSizeCm: "4",
           timeLimitSeconds: 10,
           maxPoints: 6,
@@ -247,24 +247,24 @@ describe("buildStandingsData — a direct tie-break round always applies", () =>
     };
 
     const { sets } = buildStandingsData(results, t);
-    const day1Countries = sets.find((set) => set.scope === "DAY_1" && set.subject === "COUNTRY")!;
+    const day1Clubs = sets.find((set) => set.scope === "DAY_1" && set.subject === "CLUB")!;
 
-    expect(day1Countries.hasUnresolvedTie).toBe(false);
-    const rankOf = (key: string) => day1Countries.rows.find((row) => row.key === key)!.rank;
+    expect(day1Clubs.hasUnresolvedTie).toBe(false);
+    const rankOf = (key: string) => day1Clubs.rows.find((row) => row.key === key)!.rank;
     expect(rankOf("a")).toBeLessThan(rankOf("b"));
     expect(rankOf("d")).toBeLessThan(rankOf("e"));
   });
 
-  it("still resolves the countries a round does cover when one tied country is missing from it", () => {
+  it("still resolves the clubs a round does cover when one tied club is missing from it", () => {
     // Three-way tie {a,b,g} at 100; g withdrew from the draw, so the saved
     // round (matching the tie-break dialog's own behaviour) only has
     // entries for a and b.
     const totals: ChampionshipTotals = {
       riders: new Map(),
-      countries: new Map([
-        ["a", { ...countryTotals(100, false), championshipCountryId: "a" }],
-        ["b", { ...countryTotals(100, false), championshipCountryId: "b" }],
-        ["g", { ...countryTotals(100, false), championshipCountryId: "g" }],
+      clubs: new Map([
+        ["a", { ...clubTotals(100, false), championshipClubId: "a" }],
+        ["b", { ...clubTotals(100, false), championshipClubId: "b" }],
+        ["g", { ...clubTotals(100, false), championshipClubId: "g" }],
       ]),
       runResults: new Map(),
       daysWithResults: [1],
@@ -272,11 +272,11 @@ describe("buildStandingsData — a direct tie-break round always applies", () =>
 
     const tieBreaks = new Map<TieBreakKey, StoredTieBreakRound>([
       [
-        "DAY_1:COUNTRY",
+        "DAY_1:CLUB",
         {
           id: "round-1",
           scope: "DAY_1",
-          subject: "COUNTRY",
+          subject: "CLUB",
           pegSizeCm: "4",
           timeLimitSeconds: 10,
           maxPoints: 6,
@@ -296,9 +296,9 @@ describe("buildStandingsData — a direct tie-break round always applies", () =>
     };
 
     const { sets } = buildStandingsData(results, t);
-    const day1Countries = sets.find((set) => set.scope === "DAY_1" && set.subject === "COUNTRY")!;
+    const day1Clubs = sets.find((set) => set.scope === "DAY_1" && set.subject === "CLUB")!;
 
-    const rankOf = (key: string) => day1Countries.rows.find((row) => row.key === key)!.rank;
+    const rankOf = (key: string) => day1Clubs.rows.find((row) => row.key === key)!.rank;
     // a and b are resolved relative to each other by the round...
     expect(rankOf("a")).toBeLessThan(rankOf("b"));
     // ...while g, absent from the round, keeps the shared base rank rather

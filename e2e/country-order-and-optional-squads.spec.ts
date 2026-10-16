@@ -5,19 +5,19 @@ import { E2E_ADMIN } from "./global-setup";
  * Two related workflows, both revolving around a championship whose squads are
  * not all decided at creation time:
  *
- * 1. The wizard lets a country's squad be left empty, and the Participants page
- *    lets it be filled in afterwards, any time before that country rides.
- * 2. The country start list order can be rearranged from Participants, and the
+ * 1. The wizard lets a club's squad be left empty, and the Participants page
+ *    lets it be filled in afterwards, any time before that club rides.
+ * 2. The club start list order can be rearranged from Participants, and the
  *    new order is reflected on the entry order screen immediately.
  *
- * Self-contained: it registers its own extra rider for each country rather
+ * Self-contained: it registers its own extra rider for each club rather
  * than assuming another spec file ran first, because Playwright does not
  * guarantee an order between spec files.
  */
 test.describe.configure({ mode: "serial" });
 
 const TEMPLATE_NAME = "E2E order template";
-const CHAMPIONSHIP_NAME = "E2E Country Order And Optional Squads";
+const CHAMPIONSHIP_NAME = "E2E Club Order And Optional Squads";
 
 async function signIn(page: Page): Promise<void> {
   await page.goto("/sign-in");
@@ -38,7 +38,7 @@ test("create the template this spec uses", async ({ page }) => {
   await expect(page.getByText(/Template created/i)).toBeVisible();
 });
 
-test("the wizard lets a country's squad be left empty", async ({ page }) => {
+test("the wizard lets a club's squad be left empty", async ({ page }) => {
   await signIn(page);
   await page.goto("/championships/new");
 
@@ -81,7 +81,7 @@ test("the wizard lets a country's squad be left empty", async ({ page }) => {
   await expect(page.getByRole("heading", { name: CHAMPIONSHIP_NAME })).toBeVisible();
 });
 
-test("the entry order screen explains a country still needs its squad, with a link to fix it", async ({
+test("the entry order screen explains a club still needs its squad, with a link to fix it", async ({
   page,
 }) => {
   await signIn(page);
@@ -99,7 +99,7 @@ test("the entry order screen explains a country still needs its squad, with a li
   await expect(page).toHaveURL(/\/participants$/);
 });
 
-test("riders can be added for a country after the championship was created", async ({ page }) => {
+test("riders can be added for a club after the championship was created", async ({ page }) => {
   await signIn(page);
   await page.goto("/championships");
   await page.getByRole("link", { name: new RegExp(CHAMPIONSHIP_NAME, "i") }).click();
@@ -122,7 +122,7 @@ test("riders can be added for a country after the championship was created", asy
   await expect(page.getByText("OM Rider 1")).toBeVisible();
 });
 
-test("the country start list order can be changed before the first run, and is used everywhere", async ({
+test("the club start list order can be changed before the first run, and is used everywhere", async ({
   page,
 }) => {
   await signIn(page);
@@ -152,7 +152,7 @@ test("the country start list order can be changed before the first run, and is u
   await page.getByRole("link", { name: new RegExp(CHAMPIONSHIP_NAME, "i") }).click();
   const firstRun = page.locator('a[href*="/runs/"]').first();
   await firstRun.click();
-  await expect(page.getByText(/countries confirmed/)).toBeVisible();
+  await expect(page.getByText(/clubs confirmed/)).toBeVisible();
   const runPageText = await page.locator("main").innerText();
   expect(runPageText.indexOf("Oman")).toBeGreaterThanOrEqual(0);
   expect(runPageText.indexOf("Jordan")).toBeGreaterThanOrEqual(0);
@@ -167,17 +167,17 @@ test("the order locks once the championship's first run starts", async ({ page }
   const firstRun = page.locator('a[href*="/runs/"]').first();
   await firstRun.click();
 
-  // Both countries now have full squads: confirm "no change" for each and
+  // Both clubs now have full squads: confirm "no change" for each and
   // start the run.
   const confirmButtons = page.getByRole("button", { name: "Confirm", exact: true });
   await confirmButtons.first().click();
-  await expect(page.getByText("1 of 2 countries confirmed")).toBeVisible();
+  await expect(page.getByText("1 of 2 clubs confirmed")).toBeVisible();
   await page.getByRole("button", { name: "Confirm", exact: true }).first().click();
-  await expect(page.getByText("2 of 2 countries confirmed")).toBeVisible();
+  await expect(page.getByText("2 of 2 clubs confirmed")).toBeVisible();
   await page.getByRole("button", { name: "Start run" }).click();
   await expect(page.getByText("Scoring in progress")).toBeVisible();
 
   await page.getByRole("link", { name: "Participants" }).click();
-  await expect(page.getByText(/country order is now locked/i)).toBeVisible();
+  await expect(page.getByText(/club order is now locked/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Move (up|down):/ })).toHaveCount(0);
 });

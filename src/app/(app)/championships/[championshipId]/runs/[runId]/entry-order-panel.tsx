@@ -9,7 +9,6 @@ import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/button";
 import { Badge, Callout, Card, CardContent, CardHeader, CardTitle } from "@/components/ui/surfaces";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/form-controls";
-import { CountryFlag } from "@/components/common/country-flag";
 import { useI18n } from "@/lib/i18n/client";
 import { confirmEntryOrderAction } from "@/server/actions/runs";
 import {
@@ -17,7 +16,7 @@ import {
   validateEntryOrder,
   type RosterMember,
 } from "@/domain/entry-order";
-import { RIDERS_PER_COUNTRY_PER_RUN } from "@/domain/scoring/event-types";
+import { RIDERS_PER_CLUB_PER_RUN } from "@/domain/scoring/event-types";
 
 export interface EntryOrderRoster {
   readonly championshipRiderId: string;
@@ -26,10 +25,9 @@ export interface EntryOrderRoster {
   readonly initialOrder: number | null;
 }
 
-export interface EntryOrderCountry {
-  readonly championshipCountryId: string;
-  readonly iso2: string;
-  readonly countryName: string;
+export interface EntryOrderClub {
+  readonly championshipClubId: string;
+  readonly clubName: string;
   readonly decision: "NO_CHANGE" | "CHANGED" | null;
   readonly previousOrder: readonly string[];
   readonly confirmedOrder: readonly string[];
@@ -44,44 +42,44 @@ function toRosterMembers(roster: readonly EntryOrderRoster[]): RosterMember[] {
   }));
 }
 
-function CountryEntryOrder({
+function ClubEntryOrder({
   championshipId,
   runId,
-  country,
+  club,
   canManage,
   onSaved,
 }: {
   championshipId: string;
   runId: string;
-  country: EntryOrderCountry;
+  club: EntryOrderClub;
   canManage: boolean;
   onSaved: () => void;
 }) {
   const { t } = useI18n();
-  const members = React.useMemo(() => toRosterMembers(country.roster), [country.roster]);
+  const members = React.useMemo(() => toRosterMembers(club.roster), [club.roster]);
   const names = React.useMemo(
-    () => new Map(country.roster.map((member) => [member.championshipRiderId, member.fullName])),
-    [country.roster],
+    () => new Map(club.roster.map((member) => [member.championshipRiderId, member.fullName])),
+    [club.roster],
   );
 
   const baseline = React.useMemo(
     () =>
-      country.confirmedOrder.length > 0
-        ? [...country.confirmedOrder]
-        : [...inheritedEntryOrder(country.previousOrder, members)],
-    [country.confirmedOrder, country.previousOrder, members],
+      club.confirmedOrder.length > 0
+        ? [...club.confirmedOrder]
+        : [...inheritedEntryOrder(club.previousOrder, members)],
+    [club.confirmedOrder, club.previousOrder, members],
   );
 
   const [mode, setMode] = React.useState<"NO_CHANGE" | "CHANGED">(
-    country.decision ?? "NO_CHANGE",
+    club.decision ?? "NO_CHANGE",
   );
   const [order, setOrder] = React.useState<string[]>(baseline);
   const [pending, startTransition] = React.useTransition();
 
-  const reserves = country.roster.filter(
+  const reserves = club.roster.filter(
     (member) => !order.includes(member.championshipRiderId),
   );
-  const invalid = validateEntryOrder(members, order, RIDERS_PER_COUNTRY_PER_RUN);
+  const invalid = validateEntryOrder(members, order, RIDERS_PER_CLUB_PER_RUN);
 
   function move(index: number, direction: -1 | 1) {
     const target = index + direction;
@@ -103,7 +101,7 @@ function CountryEntryOrder({
     startTransition(async () => {
       const result = await confirmEntryOrderAction({
         runId,
-        championshipCountryId: country.championshipCountryId,
+        championshipClubId: club.championshipClubId,
         decision: mode,
         order: mode === "CHANGED" ? order : undefined,
       });
@@ -116,7 +114,7 @@ function CountryEntryOrder({
     });
   }
 
-  const confirmed = country.decision !== null;
+  const confirmed = club.decision !== null;
 
   return (
     <Card
@@ -127,13 +125,12 @@ function CountryEntryOrder({
     >
       <CardHeader className="py-2.5">
         <CardTitle className="flex items-center gap-2 text-sm">
-          <CountryFlag iso2={country.iso2} size="md" />
-          {country.countryName}
+          {club.clubName}
         </CardTitle>
         {confirmed ? (
           <Badge tone="success">
             <Check className="size-3" aria-hidden />
-            {country.decision === "NO_CHANGE" ? t("runs.noChange") : t("runs.changeOrder")}
+            {club.decision === "NO_CHANGE" ? t("runs.noChange") : t("runs.changeOrder")}
           </Badge>
         ) : (
           <Badge tone="warning">
@@ -151,17 +148,17 @@ function CountryEntryOrder({
               const next = value as "NO_CHANGE" | "CHANGED";
               setMode(next);
               if (next === "NO_CHANGE") {
-                setOrder([...inheritedEntryOrder(country.previousOrder, members)]);
+                setOrder([...inheritedEntryOrder(club.previousOrder, members)]);
               }
             }}
             className="flex flex-wrap gap-4"
           >
             <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <RadioGroupItem value="NO_CHANGE" id={`nc-${country.championshipCountryId}`} />
+              <RadioGroupItem value="NO_CHANGE" id={`nc-${club.championshipClubId}`} />
               {t("runs.noChange")}
             </label>
             <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <RadioGroupItem value="CHANGED" id={`ch-${country.championshipCountryId}`} />
+              <RadioGroupItem value="CHANGED" id={`ch-${club.championshipClubId}`} />
               {t("runs.changeOrder")}
             </label>
           </RadioGroup>
@@ -243,7 +240,7 @@ function CountryEntryOrder({
           <div className="flex justify-end">
             <Button size="sm" loading={pending} disabled={invalid !== null} onClick={save}>
               <Check aria-hidden />
-              {confirmed ? t("common.save") : t("runs.confirmCountry")}
+              {confirmed ? t("common.save") : t("runs.confirmClub")}
             </Button>
           </div>
         ) : null}
@@ -255,7 +252,7 @@ function CountryEntryOrder({
 export function EntryOrderPanel({
   championshipId,
   runId,
-  countries,
+  clubs,
   confirmedCount,
   totalCount,
   canManage,
@@ -264,14 +261,14 @@ export function EntryOrderPanel({
 }: {
   championshipId: string;
   runId: string;
-  countries: readonly EntryOrderCountry[];
+  clubs: readonly EntryOrderClub[];
   confirmedCount: number;
   totalCount: number;
   canManage: boolean;
   /**
    * True for every run after the first in its event: the lineup can only be
    * set once per event, so these runs carry over the first run's order
-   * automatically once every country has confirmed it there, rather than
+   * automatically once every club has confirmed it there, rather than
    * asking for a fresh confirmation before each run.
    */
   locked: boolean;
@@ -293,17 +290,17 @@ export function EntryOrderPanel({
               : t("runs.entryOrdersHint")}
         </Callout>
         <p className="text-xs text-muted">
-          {t("runs.countriesConfirmed", { confirmed: confirmedCount, total: totalCount })}
+          {t("runs.clubsConfirmed", { confirmed: confirmedCount, total: totalCount })}
         </p>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {countries.map((country) => (
-          <CountryEntryOrder
-            key={country.championshipCountryId}
+        {clubs.map((club) => (
+          <ClubEntryOrder
+            key={club.championshipClubId}
             championshipId={championshipId}
             runId={runId}
-            country={country}
+            club={club}
             canManage={canManage}
             onSaved={() => router.refresh()}
           />

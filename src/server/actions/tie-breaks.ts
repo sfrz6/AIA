@@ -5,7 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, type Executor } from "@/db";
 import {
-  championshipCountries,
+  championshipClubs,
   championshipRiders,
   championships,
   tieBreakEntries,
@@ -18,12 +18,12 @@ import { recordAudit } from "@/server/services/audit";
 import { DomainError, ok, run, type ActionResult } from "./result";
 
 const entrySchema = z.object({
-  /** A championship rider for an individual round, a championship country for a country round. */
+  /** A championship rider for an individual round, a championship club for a club round. */
   subjectId: z.uuid(),
   timeSeconds: z
     .string()
     .regex(/^\d{1,4}(\.\d{1,2})?$/, "A time must be a number of seconds."),
-  /** One score for an individual round, one per rider taking part for a country round. */
+  /** One score for an individual round, one per rider taking part for a club round. */
   scores: z
     .array(
       z.object({
@@ -38,7 +38,7 @@ const entrySchema = z.object({
 const saveSchema = z.object({
   championshipId: z.uuid(),
   scope: z.enum(["DAY_1", "DAY_2", "DAY_3", "OVERALL"]),
-  subject: z.enum(["INDIVIDUAL", "COUNTRY"]),
+  subject: z.enum(["INDIVIDUAL", "CLUB"]),
   entries: z.array(entrySchema).max(60),
 });
 
@@ -62,12 +62,12 @@ async function assertSubjectsBelong(tx: Executor, input: SaveInput): Promise<voi
       .select({ id: championshipRiders.id })
       .from(championshipRiders)
       .innerJoin(
-        championshipCountries,
-        eq(championshipCountries.id, championshipRiders.championshipCountryId),
+        championshipClubs,
+        eq(championshipClubs.id, championshipRiders.championshipClubId),
       )
       .where(
         and(
-          eq(championshipCountries.championshipId, input.championshipId),
+          eq(championshipClubs.championshipId, input.championshipId),
           inArray(championshipRiders.id, [...riderIds]),
         ),
       );
@@ -76,20 +76,20 @@ async function assertSubjectsBelong(tx: Executor, input: SaveInput): Promise<voi
     }
   }
 
-  if (input.subject === "COUNTRY") {
-    const countryIds = input.entries.map((entry) => entry.subjectId);
-    if (countryIds.length > 0) {
+  if (input.subject === "CLUB") {
+    const clubIds = input.entries.map((entry) => entry.subjectId);
+    if (clubIds.length > 0) {
       const rows = await tx
-        .select({ id: championshipCountries.id })
-        .from(championshipCountries)
+        .select({ id: championshipClubs.id })
+        .from(championshipClubs)
         .where(
           and(
-            eq(championshipCountries.championshipId, input.championshipId),
-            inArray(championshipCountries.id, countryIds),
+            eq(championshipClubs.championshipId, input.championshipId),
+            inArray(championshipClubs.id, clubIds),
           ),
         );
-      if (rows.length !== new Set(countryIds).size) {
-        throw new DomainError("A country in this round is not in this championship.", "VALIDATION");
+      if (rows.length !== new Set(clubIds).size) {
+        throw new DomainError("A club in this round is not in this championship.", "VALIDATION");
       }
     }
   }
@@ -149,7 +149,7 @@ export async function saveTieBreakRoundAction(
           .select({
             entryId: tieBreakEntries.id,
             championshipRiderId: tieBreakEntries.championshipRiderId,
-            championshipCountryId: tieBreakEntries.championshipCountryId,
+            championshipClubId: tieBreakEntries.championshipClubId,
             timeSeconds: tieBreakEntries.timeSeconds,
           })
           .from(tieBreakEntries)
@@ -190,7 +190,7 @@ export async function saveTieBreakRoundAction(
           .values({
             tieBreakRoundId: round.id,
             championshipRiderId: data.subject === "INDIVIDUAL" ? entry.subjectId : null,
-            championshipCountryId: data.subject === "COUNTRY" ? entry.subjectId : null,
+            championshipClubId: data.subject === "CLUB" ? entry.subjectId : null,
             timeSeconds: entry.timeSeconds,
           })
           .returning({ id: tieBreakEntries.id });

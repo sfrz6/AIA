@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1791365267373,
-      "tag": "0000_panoramic_weapon_omega",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1791401472845,
-      "tag": "0001_swift_centennial",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1791749369489,
-      "tag": "0002_new_makkari",
+      "when": 1792174611739,
+      "tag": "0000_silly_warpath",
       "breakpoints": true
     }
   ]

@@ -83,7 +83,7 @@ export default async function PublicResultsIndexPage() {
                     <Button variant="ghost" size="sm" asChild>
                       <Link href={`/results/${championship.slug}/participants`}>
                         <Users aria-hidden />
-                        {t("publicResults.participatingCountries")}
+                        {t("publicResults.participatingClubs")}
                       </Link>
                     </Button>
                   </div>

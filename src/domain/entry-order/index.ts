@@ -1,4 +1,4 @@
-import { RIDERS_PER_COUNTRY_PER_RUN } from "@/domain/scoring/event-types";
+import { RIDERS_PER_CLUB_PER_RUN } from "@/domain/scoring/event-types";
 
 export interface RosterMember {
   readonly championshipRiderId: string;
@@ -19,7 +19,7 @@ export interface EntryOrderValidationError {
 }
 
 /**
- * The order a country starts the championship with.
+ * The order a club starts the championship with.
  *
  * Taken from the nominated active riders, in the order the squad was entered.
  * The reserve is deliberately excluded: a reserve rides only when the operator
@@ -34,10 +34,10 @@ export function initialEntryOrder(roster: readonly RosterMember[]): readonly str
 }
 
 /**
- * The order a country carries into a run when the operator records "no change".
+ * The order a club carries into a run when the operator records "no change".
  *
  * `previousOrder` is the order confirmed for the most recent earlier run. When
- * there is none, because this is the country's first run, the squad's nominated
+ * there is none, because this is the club's first run, the squad's nominated
  * starting order is used instead.
  */
 export function inheritedEntryOrder(
@@ -49,24 +49,24 @@ export function inheritedEntryOrder(
 }
 
 /**
- * Checks a proposed order against the country's championship roster.
+ * Checks a proposed order against the club's championship roster.
  *
  * The order must name exactly the riders that will take part in the run, each
- * one once, and every one of them must belong to this country's squad. Any of
+ * one once, and every one of them must belong to this club's squad. Any of
  * the squad's riders may appear, so substituting the reserve for an active
  * rider is expressed simply by naming the reserve in the order.
  */
 export function validateEntryOrder(
   roster: readonly RosterMember[],
   proposed: readonly string[],
-  ridersPerRun: number = RIDERS_PER_COUNTRY_PER_RUN,
+  ridersPerRun: number = RIDERS_PER_CLUB_PER_RUN,
 ): EntryOrderValidationError | null {
   const eligible = new Set(roster.map((member) => member.championshipRiderId));
 
   if (roster.filter((member) => member.rosterSlot === "ACTIVE").length < ridersPerRun) {
     return {
       code: "INCOMPLETE_ROSTER",
-      message: `This country needs ${ridersPerRun} active riders before a run can be prepared.`,
+      message: `This club needs ${ridersPerRun} active riders before a run can be prepared.`,
     };
   }
 

@@ -15,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/surfaces";
-import { CountryFlag, CountryLabel } from "@/components/common/country-flag";
 import { formatCompetitionDate, formatPegSize } from "@/components/common/formatting";
 import { eventLabel } from "@/components/common/labels";
 import type { EventTypeKey } from "@/domain/scoring/event-types";
@@ -23,7 +22,7 @@ import { cn } from "@/lib/cn";
 import type { MessageKey } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
 import { createChampionshipAction } from "@/server/actions/championships";
-import { listCountryRidersAction } from "@/server/actions/registry-queries";
+import { listClubRidersAction } from "@/server/actions/registry-queries";
 import {
   SquadPicker,
   activeInOrder,
@@ -59,9 +58,8 @@ export interface WizardTemplate {
   readonly days: readonly WizardTemplateDay[];
 }
 
-export interface WizardCountry {
+export interface WizardClub {
   readonly id: string;
-  readonly iso2: string;
   readonly name: string;
   readonly riderCount: number;
 }
@@ -69,7 +67,7 @@ export interface WizardCountry {
 const STEP_KEYS: readonly MessageKey[] = [
   "championships.stepTemplate",
   "championships.stepDetails",
-  "championships.stepCountries",
+  "championships.stepClubs",
   "championships.stepRiders",
   "championships.stepReview",
 ];
@@ -78,36 +76,35 @@ const MIN_NAME_LENGTH = 3;
 const MAX_NAME_LENGTH = 160;
 const MIN_LOCATION_LENGTH = 2;
 const MAX_TEXT_LENGTH = 160;
-const MIN_COUNTRIES = 2;
-
-/** A championship always spans exactly three competition days. */
-const CHAMPIONSHIP_DAYS = 3;
+const MIN_CLUBS = 2;
 
 /**
- * The three competition dates derived from the start date, or null while the
- * start date is incomplete.
+ * The competition dates derived from the start date, one per day the chosen
+ * template actually uses, or null while the start date is incomplete.
  *
- * `addDays` and `CHAMPIONSHIP_DAYS` belong to the championship service, whose
- * module reaches the database client and therefore cannot be pulled into a
- * browser bundle. The arithmetic here is the same one: whole days added in UTC,
- * so a calendar date never shifts across a time zone, and the preview always
- * matches the dates the service stores.
+ * `addDays` belongs to the championship service, whose module reaches the
+ * database client and therefore cannot be pulled into a browser bundle. The
+ * arithmetic here is the same one: whole days added in UTC, so a calendar
+ * date never shifts across a time zone, and the preview always matches the
+ * dates the service stores. The day count mirrors
+ * `createChampionshipFromTemplate`, which creates one championship day per
+ * template day that has at least one event, not a fixed number.
  */
-function competitionDatesFrom(startDate: string): readonly string[] | null {
+function competitionDatesFrom(startDate: string, dayCount: number): readonly string[] | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return null;
   const [year, month, day] = startDate.split("-").map(Number);
   if (!year || !month || !day) return null;
-  return Array.from({ length: CHAMPIONSHIP_DAYS }, (_, index) =>
+  return Array.from({ length: dayCount }, (_, index) =>
     new Date(Date.UTC(year, month - 1, day + index)).toISOString().slice(0, 10),
   );
 }
 
 export function ChampionshipWizard({
   templates,
-  countries,
+  clubs,
 }: {
   templates: readonly WizardTemplate[];
-  countries: readonly WizardCountry[];
+  clubs: readonly WizardClub[];
 }) {
   const { locale, t } = useI18n();
   const router = useRouter();
@@ -122,45 +119,48 @@ export function ChampionshipWizard({
   const [selected, setSelected] = React.useState<readonly string[]>([]);
   const [search, setSearch] = React.useState("");
   const [selections, setSelections] = React.useState<Record<string, SquadSelection>>({});
-  const [ridersByCountry, setRidersByCountry] = React.useState<
+  const [ridersByClub, setRidersByClub] = React.useState<
     Record<string, readonly SquadRiderOption[]>
   >({});
   const [loadingRiders, setLoadingRiders] = React.useState<Record<string, boolean>>({});
-  const [openCountry, setOpenCountry] = React.useState<string | null>(null);
+  const [openClub, setOpenClub] = React.useState<string | null>(null);
   const [pending, startTransition] = React.useTransition();
 
-  // A country's registry is fetched once per country and kept for the rest of
+  // A club's registry is fetched once per club and kept for the rest of
   // the wizard, so going back and forth between the steps costs nothing.
   const requested = React.useRef<Set<string>>(new Set());
 
-  const loadRiders = React.useCallback((countryId: string) => {
-    if (requested.current.has(countryId)) return;
-    requested.current.add(countryId);
-    setLoadingRiders((previous) => ({ ...previous, [countryId]: true }));
-    void listCountryRidersAction(countryId).then((result) => {
-      setLoadingRiders((previous) => ({ ...previous, [countryId]: false }));
+  const loadRiders = React.useCallback((clubId: string) => {
+    if (requested.current.has(clubId)) return;
+    requested.current.add(clubId);
+    setLoadingRiders((previous) => ({ ...previous, [clubId]: true }));
+    void listClubRidersAction(clubId).then((result) => {
+      setLoadingRiders((previous) => ({ ...previous, [clubId]: false }));
       if (!result.ok) {
-        requested.current.delete(countryId);
+        requested.current.delete(clubId);
         toast.error(result.error);
         return;
       }
-      setRidersByCountry((previous) => ({ ...previous, [countryId]: result.data }));
+      setRidersByClub((previous) => ({ ...previous, [clubId]: result.data }));
     });
   }, []);
 
-  const countryById = React.useMemo(
-    () => new Map(countries.map((country) => [country.id, country])),
-    [countries],
+  const clubById = React.useMemo(
+    () => new Map(clubs.map((club) => [club.id, club])),
+    [clubs],
   );
 
   const template = templates.find((entry) => entry.id === templateId) ?? null;
+  const templateActiveDayCount = template
+    ? Math.max(1, template.days.filter((day) => day.events.length > 0).length)
+    : 1;
 
   const trimmedName = name.trim();
   const trimmedNameAr = nameAr.trim();
   const trimmedLocation = location.trim();
   const trimmedOrganizer = organizer.trim();
 
-  const competitionDates = competitionDatesFrom(startDate);
+  const competitionDates = competitionDatesFrom(startDate, templateActiveDayCount);
 
   const detailsValid =
     trimmedName.length >= MIN_NAME_LENGTH &&
@@ -171,18 +171,18 @@ export function ChampionshipWizard({
     trimmedOrganizer.length <= MAX_TEXT_LENGTH &&
     competitionDates !== null;
 
-  // Riders are optional at this step: a country's squad is either the full
+  // Riders are optional at this step: a club's squad is either the full
   // four active riders plus one reserve, or left empty to decide later from
-  // the Participants page, any time before that country's first run.
-  const squadsSavable = selected.every((countryId) =>
-    isSquadSavable(selections[countryId] ?? {}),
+  // the Participants page, any time before that club's first run.
+  const squadsSavable = selected.every((clubId) =>
+    isSquadSavable(selections[clubId] ?? {}),
   );
 
   const stepValid: readonly boolean[] = [
     template !== null,
     detailsValid,
-    selected.length >= MIN_COUNTRIES,
-    selected.length >= MIN_COUNTRIES && squadsSavable,
+    selected.length >= MIN_CLUBS,
+    selected.length >= MIN_CLUBS && squadsSavable,
     true,
   ];
 
@@ -195,41 +195,37 @@ export function ChampionshipWizard({
     setStep(index);
   }
 
-  function toggleCountry(countryId: string, checked: boolean) {
+  function toggleClub(clubId: string, checked: boolean) {
     setSelected((previous) =>
       checked
-        ? previous.includes(countryId)
+        ? previous.includes(clubId)
           ? previous
-          : [...previous, countryId]
-        : previous.filter((entry) => entry !== countryId),
+          : [...previous, clubId]
+        : previous.filter((entry) => entry !== clubId),
     );
     if (checked) {
-      loadRiders(countryId);
+      loadRiders(clubId);
       return;
     }
     setSelections((previous) => {
       const next = { ...previous };
-      delete next[countryId];
+      delete next[clubId];
       return next;
     });
   }
 
-  // Entering the riders step covers the countries that were selected before a
+  // Entering the riders step covers the clubs that were selected before a
   // fetch could be started, for example after going back and editing.
   React.useEffect(() => {
     if (step !== 3) return;
-    for (const countryId of selected) loadRiders(countryId);
+    for (const clubId of selected) loadRiders(clubId);
   }, [step, selected, loadRiders]);
 
-  const filteredCountries = React.useMemo(() => {
+  const filteredClubs = React.useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return countries;
-    return countries.filter(
-      (country) =>
-        country.name.toLowerCase().includes(term) ||
-        country.iso2.toLowerCase().startsWith(term),
-    );
-  }, [countries, search]);
+    if (!term) return clubs;
+    return clubs.filter((club) => club.name.toLowerCase().includes(term));
+  }, [clubs, search]);
 
   function create() {
     if (!template || !stepValid.every(Boolean) || pending) return;
@@ -241,9 +237,9 @@ export function ChampionshipWizard({
         startDate,
         location: trimmedLocation,
         organizer: trimmedOrganizer || null,
-        squads: selected.map((countryId) => ({
-          countryId,
-          riders: squadRiders(selections[countryId] ?? {}),
+        squads: selected.map((clubId) => ({
+          clubId,
+          riders: squadRiders(selections[clubId] ?? {}),
         })),
       });
       if (!result.ok) {
@@ -256,8 +252,8 @@ export function ChampionshipWizard({
   }
 
   const blockingMessage =
-    step === 2 && selected.length < MIN_COUNTRIES
-      ? t("championships.needTwoCountries")
+    step === 2 && selected.length < MIN_CLUBS
+      ? t("championships.needTwoClubs")
       : step === 3 && !squadsSavable
         ? t("championships.incompleteSquads")
         : null;
@@ -458,41 +454,40 @@ export function ChampionshipWizard({
       {step === 2 ? (
         <Card>
           <CardHeader>
-            <CardTitle>{t("championships.selectCountries")}</CardTitle>
-            <Badge tone={selected.length >= MIN_COUNTRIES ? "success" : "outline"}>
-              {t("championships.selectedCountries", { count: selected.length })}
+            <CardTitle>{t("championships.selectClubs")}</CardTitle>
+            <Badge tone={selected.length >= MIN_CLUBS ? "success" : "outline"}>
+              {t("championships.selectedClubs", { count: selected.length })}
             </Badge>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Callout tone="info">{t("championships.selectCountriesHint")}</Callout>
-            <Field label={t("common.search")} htmlFor="wizard-country-search">
+            <Callout tone="info">{t("championships.selectClubsHint")}</Callout>
+            <Field label={t("common.search")} htmlFor="wizard-club-search">
               <Input
-                id="wizard-country-search"
+                id="wizard-club-search"
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("countries.searchPlaceholder")}
+                placeholder={t("clubs.searchPlaceholder")}
                 autoComplete="off"
               />
             </Field>
-            {filteredCountries.length === 0 ? (
+            {filteredClubs.length === 0 ? (
               <p className="text-sm text-muted">{t("common.noResults")}</p>
             ) : (
               <ul className="max-h-96 divide-hairline overflow-y-auto rounded-md border border-border">
-                {filteredCountries.map((country) => {
-                  const checked = selected.includes(country.id);
+                {filteredClubs.map((club) => {
+                  const checked = selected.includes(club.id);
                   return (
-                    <li key={country.id}>
+                    <li key={club.id}>
                       <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-sunken">
                         <Checkbox
                           checked={checked}
-                          onCheckedChange={(next) => toggleCountry(country.id, next === true)}
+                          onCheckedChange={(next) => toggleClub(club.id, next === true)}
                         />
-                        <CountryFlag iso2={country.iso2} size="md" />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">{country.name}</span>
+                          <span className="block truncate text-sm">{club.name}</span>
                           <span className="block text-xs text-muted">
-                            {t("countries.ridersCount", { count: country.riderCount })}
+                            {t("clubs.ridersCount", { count: club.riderCount })}
                           </span>
                         </span>
                       </label>
@@ -509,36 +504,31 @@ export function ChampionshipWizard({
         <div className="space-y-3">
           <Callout tone="info">{t("championships.ridersHint")}</Callout>
           <Callout tone="info">{t("championships.ridersOptionalHint")}</Callout>
-          {selected.map((countryId) => {
-            const country = countryById.get(countryId);
-            if (!country) return null;
-            const selection = selections[countryId] ?? {};
-            const riders = ridersByCountry[countryId] ?? [];
+          {selected.map((clubId) => {
+            const club = clubById.get(clubId);
+            if (!club) return null;
+            const selection = selections[clubId] ?? {};
+            const riders = ridersByClub[clubId] ?? [];
             const complete = isSquadComplete(selection);
             const empty = isSquadEmpty(selection);
-            const isOpen = openCountry === countryId;
+            const isOpen = openClub === clubId;
             return (
-              <Card key={countryId}>
+              <Card key={clubId}>
                 <button
                   type="button"
-                  onClick={() => setOpenCountry(isOpen ? null : countryId)}
+                  onClick={() => setOpenClub(isOpen ? null : clubId)}
                   aria-expanded={isOpen}
                   className="flex w-full flex-wrap items-center gap-3 px-4 py-3 text-start transition-colors hover:bg-surface-sunken"
                 >
-                  <CountryLabel
-                    iso2={country.iso2}
-                    name={country.name}
-                    size="md"
-                    className="min-w-0 flex-1 text-sm font-medium"
-                  />
-                  {loadingRiders[countryId] ? (
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{club.name}</span>
+                  {loadingRiders[clubId] ? (
                     <Loader2 className="size-4 animate-spin text-muted" aria-hidden />
                   ) : null}
                   <Badge tone={complete ? "success" : empty ? "outline" : "warning"}>
                     {complete ? <Check className="size-3" aria-hidden /> : null}
                     {empty
                       ? t("championships.ridersNotSelectedYet")
-                      : t("championships.selectedCountries", {
+                      : t("championships.selectedClubs", {
                           count: Object.keys(selection).length,
                         })}
                   </Badge>
@@ -550,18 +540,17 @@ export function ChampionshipWizard({
                 {isOpen ? (
                   <CardContent className="border-t border-border pt-4">
                     <SquadPicker
-                      countryId={country.id}
-                      countryName={country.name}
-                      iso2={country.iso2}
+                      clubId={club.id}
+                      clubName={club.name}
                       riders={riders}
                       value={selection}
                       onChange={(next) =>
-                        setSelections((previous) => ({ ...previous, [countryId]: next }))
+                        setSelections((previous) => ({ ...previous, [clubId]: next }))
                       }
                       onRiderAdded={(rider) =>
-                        setRidersByCountry((previous) => ({
+                        setRidersByClub((previous) => ({
                           ...previous,
-                          [countryId]: [...(previous[countryId] ?? []), rider],
+                          [clubId]: [...(previous[clubId] ?? []), rider],
                         }))
                       }
                     />
@@ -623,32 +612,27 @@ export function ChampionshipWizard({
                 </div>
               </dl>
 
-              <Callout tone="info">{t("championships.countryOrderHint")}</Callout>
+              <Callout tone="info">{t("championships.clubOrderHint")}</Callout>
 
               <ul className="space-y-3">
-                {selected.map((countryId, index) => {
-                  const country = countryById.get(countryId);
-                  if (!country) return null;
-                  const selection = selections[countryId] ?? {};
-                  const riders = ridersByCountry[countryId] ?? [];
+                {selected.map((clubId, index) => {
+                  const club = clubById.get(clubId);
+                  if (!club) return null;
+                  const selection = selections[clubId] ?? {};
+                  const riders = ridersByClub[clubId] ?? [];
                   const nameOf = (riderId: string) =>
                     riders.find((rider) => rider.id === riderId)?.fullName ?? "";
                   const reserve = reserveRiderId(selection);
                   return (
                     <li
-                      key={countryId}
+                      key={clubId}
                       className="rounded-md border border-border bg-surface-sunken p-3"
                     >
                       <div className="flex items-center gap-2">
                         <span className="numeric inline-flex size-5 shrink-0 items-center justify-center rounded-sm bg-surface-raised text-xs font-semibold text-muted">
                           {index + 1}
                         </span>
-                        <CountryLabel
-                          iso2={country.iso2}
-                          name={country.name}
-                          size="md"
-                          className="text-sm font-medium"
-                        />
+                        <span className="truncate text-sm font-medium">{club.name}</span>
                       </div>
                       {isSquadEmpty(selection) ? (
                         <p className="mt-2 text-sm text-muted">

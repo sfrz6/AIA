@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, Trophy } from "lucide-react";
 import { scopeForDay, type StandingsScope } from "@/domain/results";
-import { ItpfLogo } from "@/components/common/itpf-logo";
+import { AiaLogo } from "@/components/common/aia-logo";
 import {
   championshipDisplayName,
   formatCompetitionDate,
@@ -97,7 +97,7 @@ export default async function PublicChampionshipResultsPage({
       </Link>
 
       <header className="flex flex-wrap items-start gap-4">
-        <ItpfLogo width={56} priority />
+        <AiaLogo width={56} priority />
         <div className="min-w-0 flex-1 space-y-1">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
             {championshipDisplayName(championship.name, championship.nameAr, locale)}

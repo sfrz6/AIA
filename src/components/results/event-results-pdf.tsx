@@ -5,12 +5,11 @@ import type { EventResultsPrintState } from "@/server/services/runs";
 import { formatPegSize, formatTime } from "@/components/common/formatting";
 import { eventLabel } from "@/components/common/labels";
 import { targetLabels } from "@/components/common/target-labels";
-import { CountryFlag } from "@/components/common/country-flag";
 import type { Translator } from "@/lib/i18n";
 
 /**
  * One event's actual recorded scores, laid out exactly like the referees'
- * blank Round sheet (grouped by country, a column group per run), but filled
+ * blank Round sheet (grouped by club, a column group per run), but filled
  * in — this is what makes a Day PDF a full record of the day rather than
  * just its final standings.
  */
@@ -34,19 +33,18 @@ export function EventResultsPdfTable({
       </h2>
 
       <div className="space-y-3">
-        {state.countries.map((country) => {
+        {state.clubs.map((club) => {
           const names = new Map(
-            country.roster.map((member) => [member.championshipRiderId, member.fullName]),
+            club.roster.map((member) => [member.championshipRiderId, member.fullName]),
           );
-          const units = buildScoringUnits(country.confirmedOrder, definition.ridersPerScoringUnit);
+          const units = buildScoringUnits(club.confirmedOrder, definition.ridersPerScoringUnit);
 
           if (units.length === 0) return null;
 
           return (
-            <div key={country.championshipCountryId} className="print-avoid-break border border-black">
+            <div key={club.championshipClubId} className="print-avoid-break border border-black">
               <h3 className="flex items-center gap-2 border-b border-black bg-neutral-100 px-2 py-1 text-[9pt] font-bold">
-                <CountryFlag iso2={country.iso2} size="sm" />
-                {country.countryName}
+                {club.clubName}
               </h3>
 
               <table className="w-full border-collapse text-[8.5pt]">
@@ -111,7 +109,7 @@ export function EventResultsPdfTable({
                             const runValues = resultsByRun.get(run.runId);
                             const riderValues = runValues?.ridersById.get(rider.championshipRiderId);
                             const unitValues = runValues?.unitsByKey.get(
-                              `${country.championshipCountryId}:${unit.unitIndex}`,
+                              `${club.championshipClubId}:${unit.unitIndex}`,
                             );
                             const showUnitCells = !sharedTime || riderIndex === 0;
                             return (

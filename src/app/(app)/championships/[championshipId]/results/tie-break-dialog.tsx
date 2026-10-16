@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
-import { CountryFlag } from "@/components/common/country-flag";
 import { formatPegSize, formatTime } from "@/components/common/formatting";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/form-controls";
@@ -104,7 +103,7 @@ export function TieBreakDialog({
   subject: StandingsSubject;
   /** Rows that still share a rank, which are exactly the rows that ride the draw. */
   tiedRows: readonly StandingRow[];
-  /** The four active riders of each country, for a country round. */
+  /** The four active riders of each club, for a club round. */
   activeRiders: Readonly<Record<string, readonly TieBreakRiderOption[]>>;
   /** The round already stored for this scope and subject, if any. */
   storedEntries: readonly StoredTieBreakEntry[];
@@ -115,14 +114,14 @@ export function TieBreakDialog({
   const [pending, startTransition] = React.useTransition();
 
   const defaults = TIE_BREAK_DEFAULTS[subject];
-  const isCountry = subject === "COUNTRY";
+  const isClub = subject === "CLUB";
 
   const ridersOf = React.useCallback(
     (row: StandingRow): readonly TieBreakRiderOption[] =>
-      isCountry
+      isClub
         ? (activeRiders[row.key] ?? [])
         : [{ championshipRiderId: row.key, riderName: row.name }],
-    [activeRiders, isCountry],
+    [activeRiders, isClub],
   );
 
   const [drafts, setDrafts] = React.useState<Readonly<Record<string, EntryDraft>>>(() => {
@@ -131,10 +130,10 @@ export function TieBreakDialog({
       const stored = storedEntries.find((entry) => entry.key === row.key);
       const points: Record<string, AllowedPoints> = {};
       for (const rider of ridersOf(row)) points[rider.championshipRiderId] = 0;
-      // An individual round stores one score, which prefills exactly. A country
+      // An individual round stores one score, which prefills exactly. A club
       // round is stored as one total for the four riders, so only its time can
       // be restored rider by rider.
-      if (stored && !isCountry) points[row.key] = toAllowedPoints(stored.points);
+      if (stored && !isClub) points[row.key] = toAllowedPoints(stored.points);
       initial[row.key] = { time: stored ? stored.timeSeconds : "", points };
     }
     return initial;
@@ -252,17 +251,16 @@ export function TieBreakDialog({
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
-                            <CountryFlag iso2={row.iso2} />
                             <span className="truncate">{row.name}</span>
-                            {isCountry ? null : (
+                            {isClub ? null : (
                               <span className="truncate text-xs text-muted">
-                                {row.countryName}
+                                {row.clubName}
                               </span>
                             )}
                           </span>
 
                           <span className="flex items-center gap-2">
-                            {isCountry ? null : (
+                            {isClub ? null : (
                               <PointsPicker
                                 label={`${t("results.tieBreakPoints")}: ${row.name}`}
                                 value={draft?.points[row.key] ?? 0}
@@ -284,7 +282,7 @@ export function TieBreakDialog({
                           </span>
                         </div>
 
-                        {isCountry ? (
+                        {isClub ? (
                           <ul className="space-y-1.5 border-t border-border pt-2">
                             {ridersOf(row).map((rider) => (
                               <li

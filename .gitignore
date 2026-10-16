@@ -15,3 +15,4 @@ test-results
 .vercel
 .DS_Store
 ~$*
+.old-migrations-backup

@@ -14,7 +14,7 @@ import {
 
 export type DayNumber = 1 | 2 | 3;
 export type StandingsScope = "DAY_1" | "DAY_2" | "DAY_3" | "OVERALL";
-export type StandingsSubject = "INDIVIDUAL" | "COUNTRY";
+export type StandingsSubject = "INDIVIDUAL" | "CLUB";
 
 export function scopeForDay(day: DayNumber): StandingsScope {
   return day === 1 ? "DAY_1" : day === 2 ? "DAY_2" : "DAY_3";
@@ -32,7 +32,7 @@ export interface ConfirmedRun {
 
 export interface RiderTotals {
   readonly championshipRiderId: string;
-  readonly championshipCountryId: string;
+  readonly championshipClubId: string;
   /** Points contributed per competition day. */
   readonly byDay: ReadonlyMap<DayNumber, Decimal>;
   /** Points contributed per championship event. */
@@ -40,11 +40,11 @@ export interface RiderTotals {
   readonly overall: Decimal;
 }
 
-export interface CountryTotals {
-  readonly championshipCountryId: string;
-  /** Sum of the country's riders' contributions, per day. */
+export interface ClubTotals {
+  readonly championshipClubId: string;
+  /** Sum of the club's riders' contributions, per day. */
   readonly riderPointsByDay: ReadonlyMap<DayNumber, Decimal>;
-  /** Pair, team and relay time faults charged to the country, per day. */
+  /** Pair, team and relay time faults charged to the club, per day. */
   readonly penaltiesByDay: ReadonlyMap<DayNumber, Decimal>;
   /** Rider points plus faults, per day. */
   readonly byDay: ReadonlyMap<DayNumber, Decimal>;
@@ -55,7 +55,7 @@ export interface CountryTotals {
 
 export interface ChampionshipTotals {
   readonly riders: ReadonlyMap<string, RiderTotals>;
-  readonly countries: ReadonlyMap<string, CountryTotals>;
+  readonly clubs: ReadonlyMap<string, ClubTotals>;
   readonly runResults: ReadonlyMap<string, RunScoringResult>;
   readonly daysWithResults: readonly DayNumber[];
 }
@@ -67,7 +67,7 @@ function addTo<K>(map: Map<K, Decimal>, key: K, value: Decimal): void {
 }
 
 /**
- * Aggregates every confirmed run of a championship into rider and country
+ * Aggregates every confirmed run of a championship into rider and club
  * totals.
  *
  * Only runs passed in are counted, so the caller decides what is official. The
@@ -76,7 +76,7 @@ function addTo<K>(map: Map<K, Decimal>, key: K, value: Decimal): void {
  * Individual totals are the sum of each rider's contribution: the net score
  * after their own time penalty for individual, rings and peg, and lemons and
  * peg events, and the raw score for pair, team and relay events, whose penalty
- * belongs to the country. Country totals add the country's riders' points to
+ * belongs to the club. Club totals add the club's riders' points to
  * the pair, team and relay faults. This mirrors the reference workbook, where
  * the team sheets add the individual day totals to the pair and team fault
  * columns.
@@ -86,10 +86,10 @@ export function aggregateChampionship(runs: readonly ConfirmedRun[]): Championsh
 
   const riderByDay = new Map<string, Map<DayNumber, Decimal>>();
   const riderByEvent = new Map<string, Map<string, Decimal>>();
-  const riderCountry = new Map<string, string>();
+  const riderClub = new Map<string, string>();
 
-  const countryRiderPointsByDay = new Map<string, Map<DayNumber, Decimal>>();
-  const countryPenaltiesByDay = new Map<string, Map<DayNumber, Decimal>>();
+  const clubRiderPointsByDay = new Map<string, Map<DayNumber, Decimal>>();
+  const clubPenaltiesByDay = new Map<string, Map<DayNumber, Decimal>>();
   const daysSeen = new Set<DayNumber>();
 
   for (const run of runs) {
@@ -103,7 +103,7 @@ export function aggregateChampionship(runs: readonly ConfirmedRun[]): Championsh
     daysSeen.add(run.dayNumber);
 
     for (const rider of result.riders) {
-      riderCountry.set(rider.championshipRiderId, rider.championshipCountryId);
+      riderClub.set(rider.championshipRiderId, rider.championshipClubId);
 
       let days = riderByDay.get(rider.championshipRiderId);
       if (!days) {
@@ -120,20 +120,20 @@ export function aggregateChampionship(runs: readonly ConfirmedRun[]): Championsh
       addTo(events, run.championshipEventId, rider.individualContribution);
     }
 
-    for (const country of result.countries) {
-      let points = countryRiderPointsByDay.get(country.championshipCountryId);
+    for (const club of result.clubs) {
+      let points = clubRiderPointsByDay.get(club.championshipClubId);
       if (!points) {
         points = new Map();
-        countryRiderPointsByDay.set(country.championshipCountryId, points);
+        clubRiderPointsByDay.set(club.championshipClubId, points);
       }
-      addTo(points, run.dayNumber, country.riderPointsTotal);
+      addTo(points, run.dayNumber, club.riderPointsTotal);
 
-      let penalties = countryPenaltiesByDay.get(country.championshipCountryId);
+      let penalties = clubPenaltiesByDay.get(club.championshipClubId);
       if (!penalties) {
         penalties = new Map();
-        countryPenaltiesByDay.set(country.championshipCountryId, penalties);
+        clubPenaltiesByDay.set(club.championshipClubId, penalties);
       }
-      addTo(penalties, run.dayNumber, country.countryPenaltyTotal);
+      addTo(penalties, run.dayNumber, club.clubPenaltyTotal);
     }
   }
 
@@ -143,21 +143,21 @@ export function aggregateChampionship(runs: readonly ConfirmedRun[]): Championsh
     for (const value of byDay.values()) overall = overall.plus(value);
     riders.set(championshipRiderId, {
       championshipRiderId,
-      championshipCountryId: riderCountry.get(championshipRiderId) ?? "",
+      championshipClubId: riderClub.get(championshipRiderId) ?? "",
       byDay,
       byEvent: riderByEvent.get(championshipRiderId) ?? new Map(),
       overall,
     });
   }
 
-  const countries = new Map<string, CountryTotals>();
-  const countryIds = new Set([
-    ...countryRiderPointsByDay.keys(),
-    ...countryPenaltiesByDay.keys(),
+  const clubs = new Map<string, ClubTotals>();
+  const clubIds = new Set([
+    ...clubRiderPointsByDay.keys(),
+    ...clubPenaltiesByDay.keys(),
   ]);
-  for (const championshipCountryId of countryIds) {
-    const riderPointsByDay = countryRiderPointsByDay.get(championshipCountryId) ?? new Map();
-    const penaltiesByDay = countryPenaltiesByDay.get(championshipCountryId) ?? new Map();
+  for (const championshipClubId of clubIds) {
+    const riderPointsByDay = clubRiderPointsByDay.get(championshipClubId) ?? new Map();
+    const penaltiesByDay = clubPenaltiesByDay.get(championshipClubId) ?? new Map();
     const byDay = new Map<DayNumber, Decimal>();
     let riderPointsOverall = ZERO;
     let penaltiesOverall = ZERO;
@@ -171,8 +171,8 @@ export function aggregateChampionship(runs: readonly ConfirmedRun[]): Championsh
       penaltiesOverall = penaltiesOverall.plus(penalty);
     }
 
-    countries.set(championshipCountryId, {
-      championshipCountryId,
+    clubs.set(championshipClubId, {
+      championshipClubId,
       riderPointsByDay,
       penaltiesByDay,
       byDay,
@@ -184,7 +184,7 @@ export function aggregateChampionship(runs: readonly ConfirmedRun[]): Championsh
 
   return {
     riders,
-    countries,
+    clubs,
     runResults,
     daysWithResults: DAYS.filter((day) => daysSeen.has(day)),
   };
@@ -195,7 +195,7 @@ export interface StandingsRequest {
   readonly subject: StandingsSubject;
   readonly tieBreak?: TieBreakRoundInput;
   /**
-   * Competitors or countries that take part but have not scored yet. They are
+   * Competitors or clubs that take part but have not scored yet. They are
    * ranked on zero rather than disappearing from the table.
    */
   readonly includeKeys?: readonly string[];
@@ -216,8 +216,8 @@ export function buildStandings(
       entries.set(key, day === null ? rider.overall : (rider.byDay.get(day) ?? ZERO));
     }
   } else {
-    for (const [key, country] of totals.countries) {
-      entries.set(key, day === null ? country.overall : (country.byDay.get(day) ?? ZERO));
+    for (const [key, club] of totals.clubs) {
+      entries.set(key, day === null ? club.overall : (club.byDay.get(day) ?? ZERO));
     }
   }
 

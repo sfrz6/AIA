@@ -1,5 +1,5 @@
 {
-  "id": "601cbe9e-3ec8-49d4-abe7-41f217cc5231",
+  "id": "cb05ad78-8632-464f-a92d-1c4b6c7be2d7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -419,8 +419,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.countries": {
-      "name": "countries",
+    "public.clubs": {
+      "name": "clubs",
       "schema": "",
       "columns": {
         "id": {
@@ -430,20 +430,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "iso2": {
-          "name": "iso2",
-          "type": "char(2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "iso3": {
-          "name": "iso3",
-          "type": "char(3)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name_en": {
-          "name": "name_en",
+        "name": {
+          "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -452,7 +440,7 @@
           "name": "name_ar",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "is_active": {
           "name": "is_active",
@@ -477,47 +465,17 @@
         }
       },
       "indexes": {
-        "countries_iso2_idx": {
-          "name": "countries_iso2_idx",
+        "clubs_name_idx": {
+          "name": "clubs_name_idx",
           "columns": [
             {
-              "expression": "iso2",
-              "isExpression": false,
+              "expression": "lower(btrim(\"name\"))",
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "countries_iso3_idx": {
-          "name": "countries_iso3_idx",
-          "columns": [
-            {
-              "expression": "iso3",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "countries_name_en_idx": {
-          "name": "countries_name_en_idx",
-          "columns": [
-            {
-              "expression": "name_en",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -541,8 +499,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "country_id": {
-          "name": "country_id",
+        "club_id": {
+          "name": "club_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -576,11 +534,11 @@
         }
       },
       "indexes": {
-        "riders_country_idx": {
-          "name": "riders_country_idx",
+        "riders_club_idx": {
+          "name": "riders_club_idx",
           "columns": [
             {
-              "expression": "country_id",
+              "expression": "club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -591,11 +549,11 @@
           "method": "btree",
           "with": {}
         },
-        "riders_country_name_idx": {
-          "name": "riders_country_name_idx",
+        "riders_club_name_idx": {
+          "name": "riders_club_name_idx",
           "columns": [
             {
-              "expression": "country_id",
+              "expression": "club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -614,12 +572,12 @@
         }
       },
       "foreignKeys": {
-        "riders_country_id_countries_id_fk": {
-          "name": "riders_country_id_countries_id_fk",
+        "riders_club_id_clubs_id_fk": {
+          "name": "riders_club_id_clubs_id_fk",
           "tableFrom": "riders",
-          "tableTo": "countries",
+          "tableTo": "clubs",
           "columnsFrom": [
-            "country_id"
+            "club_id"
           ],
           "columnsTo": [
             "id"
@@ -1005,8 +963,8 @@
       },
       "isRLSEnabled": false
     },
-    "public.championship_countries": {
-      "name": "championship_countries",
+    "public.championship_clubs": {
+      "name": "championship_clubs",
       "schema": "",
       "columns": {
         "id": {
@@ -1022,9 +980,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "country_id": {
-          "name": "country_id",
+        "club_id": {
+          "name": "club_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "order_index": {
+          "name": "order_index",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -1037,8 +1001,8 @@
         }
       },
       "indexes": {
-        "championship_countries_unique_idx": {
-          "name": "championship_countries_unique_idx",
+        "championship_clubs_unique_idx": {
+          "name": "championship_clubs_unique_idx",
           "columns": [
             {
               "expression": "championship_id",
@@ -1047,7 +1011,7 @@
               "nulls": "last"
             },
             {
-              "expression": "country_id",
+              "expression": "club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1058,8 +1022,29 @@
           "method": "btree",
           "with": {}
         },
-        "championship_countries_championship_idx": {
-          "name": "championship_countries_championship_idx",
+        "championship_clubs_order_idx": {
+          "name": "championship_clubs_order_idx",
+          "columns": [
+            {
+              "expression": "championship_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "order_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "championship_clubs_championship_idx": {
+          "name": "championship_clubs_championship_idx",
           "columns": [
             {
               "expression": "championship_id",
@@ -1075,9 +1060,9 @@
         }
       },
       "foreignKeys": {
-        "championship_countries_championship_id_championships_id_fk": {
-          "name": "championship_countries_championship_id_championships_id_fk",
-          "tableFrom": "championship_countries",
+        "championship_clubs_championship_id_championships_id_fk": {
+          "name": "championship_clubs_championship_id_championships_id_fk",
+          "tableFrom": "championship_clubs",
           "tableTo": "championships",
           "columnsFrom": [
             "championship_id"
@@ -1088,12 +1073,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "championship_countries_country_id_countries_id_fk": {
-          "name": "championship_countries_country_id_countries_id_fk",
-          "tableFrom": "championship_countries",
-          "tableTo": "countries",
+        "championship_clubs_club_id_clubs_id_fk": {
+          "name": "championship_clubs_club_id_clubs_id_fk",
+          "tableFrom": "championship_clubs",
+          "tableTo": "clubs",
           "columnsFrom": [
-            "country_id"
+            "club_id"
           ],
           "columnsTo": [
             "id"
@@ -1294,8 +1279,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "championship_country_id": {
-          "name": "championship_country_id",
+        "championship_club_id": {
+          "name": "championship_club_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1332,7 +1317,7 @@
           "name": "championship_riders_unique_idx",
           "columns": [
             {
-              "expression": "championship_country_id",
+              "expression": "championship_club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1353,7 +1338,7 @@
           "name": "championship_riders_order_idx",
           "columns": [
             {
-              "expression": "championship_country_id",
+              "expression": "championship_club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1371,11 +1356,11 @@
           "method": "btree",
           "with": {}
         },
-        "championship_riders_country_idx": {
-          "name": "championship_riders_country_idx",
+        "championship_riders_club_idx": {
+          "name": "championship_riders_club_idx",
           "columns": [
             {
-              "expression": "championship_country_id",
+              "expression": "championship_club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1388,12 +1373,12 @@
         }
       },
       "foreignKeys": {
-        "championship_riders_championship_country_id_championship_countries_id_fk": {
-          "name": "championship_riders_championship_country_id_championship_countries_id_fk",
+        "championship_riders_championship_club_id_championship_clubs_id_fk": {
+          "name": "championship_riders_championship_club_id_championship_clubs_id_fk",
           "tableFrom": "championship_riders",
-          "tableTo": "championship_countries",
+          "tableTo": "championship_clubs",
           "columnsFrom": [
-            "championship_country_id"
+            "championship_club_id"
           ],
           "columnsTo": [
             "id"
@@ -1600,6 +1585,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "name_ar": {
+          "name": "name_ar",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "start_date": {
           "name": "start_date",
@@ -1890,8 +1881,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "championship_country_id": {
-          "name": "championship_country_id",
+        "championship_club_id": {
+          "name": "championship_club_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1928,7 +1919,7 @@
               "nulls": "last"
             },
             {
-              "expression": "championship_country_id",
+              "expression": "championship_club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1969,12 +1960,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "run_entry_orders_championship_country_id_championship_countries_id_fk": {
-          "name": "run_entry_orders_championship_country_id_championship_countries_id_fk",
+        "run_entry_orders_championship_club_id_championship_clubs_id_fk": {
+          "name": "run_entry_orders_championship_club_id_championship_clubs_id_fk",
           "tableFrom": "run_entry_orders",
-          "tableTo": "championship_countries",
+          "tableTo": "championship_clubs",
           "columnsFrom": [
-            "championship_country_id"
+            "championship_club_id"
           ],
           "columnsTo": [
             "id"
@@ -2404,8 +2395,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "championship_country_id": {
-          "name": "championship_country_id",
+        "championship_club_id": {
+          "name": "championship_club_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -2441,7 +2432,7 @@
               "nulls": "last"
             },
             {
-              "expression": "championship_country_id",
+              "expression": "championship_club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2488,12 +2479,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "run_scoring_units_championship_country_id_championship_countries_id_fk": {
-          "name": "run_scoring_units_championship_country_id_championship_countries_id_fk",
+        "run_scoring_units_championship_club_id_championship_clubs_id_fk": {
+          "name": "run_scoring_units_championship_club_id_championship_clubs_id_fk",
           "tableFrom": "run_scoring_units",
-          "tableTo": "championship_countries",
+          "tableTo": "championship_clubs",
           "columnsFrom": [
-            "championship_country_id"
+            "championship_club_id"
           ],
           "columnsTo": [
             "id"
@@ -2540,8 +2531,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "championship_country_id": {
-          "name": "championship_country_id",
+        "championship_club_id": {
+          "name": "championship_club_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -2583,8 +2574,8 @@
           "method": "btree",
           "with": {}
         },
-        "tie_break_entries_country_idx": {
-          "name": "tie_break_entries_country_idx",
+        "tie_break_entries_club_idx": {
+          "name": "tie_break_entries_club_idx",
           "columns": [
             {
               "expression": "tie_break_round_id",
@@ -2593,14 +2584,14 @@
               "nulls": "last"
             },
             {
-              "expression": "championship_country_id",
+              "expression": "championship_club_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "where": "\"tie_break_entries\".\"championship_country_id\" is not null",
+          "where": "\"tie_break_entries\".\"championship_club_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -2633,12 +2624,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "tie_break_entries_championship_country_id_championship_countries_id_fk": {
-          "name": "tie_break_entries_championship_country_id_championship_countries_id_fk",
+        "tie_break_entries_championship_club_id_championship_clubs_id_fk": {
+          "name": "tie_break_entries_championship_club_id_championship_clubs_id_fk",
           "tableFrom": "tie_break_entries",
-          "tableTo": "championship_countries",
+          "tableTo": "championship_clubs",
           "columnsFrom": [
-            "championship_country_id"
+            "championship_club_id"
           ],
           "columnsTo": [
             "id"
@@ -2653,7 +2644,7 @@
       "checkConstraints": {
         "tie_break_entries_subject_check": {
           "name": "tie_break_entries_subject_check",
-          "value": "(\"tie_break_entries\".\"championship_rider_id\" is not null) <> (\"tie_break_entries\".\"championship_country_id\" is not null)"
+          "value": "(\"tie_break_entries\".\"championship_rider_id\" is not null) <> (\"tie_break_entries\".\"championship_club_id\" is not null)"
         },
         "tie_break_entries_time_check": {
           "name": "tie_break_entries_time_check",
@@ -2929,7 +2920,7 @@
         "MANAGE_TEMPLATES",
         "CREATE_CHAMPIONSHIP",
         "EDIT_CHAMPIONSHIP",
-        "MANAGE_CHAMPIONSHIP_COUNTRIES",
+        "MANAGE_CHAMPIONSHIP_CLUBS",
         "MANAGE_RIDERS",
         "MANAGE_ENTRY_ORDERS",
         "ENTER_SCORES",
@@ -2975,7 +2966,7 @@
       "schema": "public",
       "values": [
         "INDIVIDUAL",
-        "COUNTRY"
+        "CLUB"
       ]
     }
   },

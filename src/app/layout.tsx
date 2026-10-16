@@ -6,17 +6,17 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "ITPF Competition System",
-    template: "%s | ITPF Competition System",
+    default: "AIA Competition System",
+    template: "%s | AIA Competition System",
   },
   description:
-    "Official competition management and scoring for International Tent Pegging Federation championships.",
+    "Official competition management and scoring for Assayel International Academy championships.",
   icons: {
-    icon: "/brand/itpf-logo-light.webp",
+    icon: "/brand/aia-logo.png",
     apple: "/apple-touch-icon.png",
   },
   appleWebApp: {
-    title: "ITPF",
+    title: "AIA",
     statusBarStyle: "black-translucent",
   },
   robots: { index: false, follow: false },

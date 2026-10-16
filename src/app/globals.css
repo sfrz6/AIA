@@ -3,26 +3,27 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * ITPF visual identity.
+ * Assayel International Academy visual identity.
  *
- * The palette is derived from the supplied federation logo: the teal of the
- * horse mark (#00718F) and the gold of the lance and wordmark (#8D744A), over a
- * cool near-navy neutral ramp. This is operational software used at a
- * competition ground, so the design favours contrast, density and calm over
- * decoration.
+ * The palette is derived from the academy logo: a single warm gold
+ * (#93682E at its mid tone), over a cool near-navy neutral ramp. A second,
+ * slightly deeper bronze ramp (`--color-gold-*`) carries the accent role, so
+ * the interface stays in one metallic-gold family rather than reintroducing
+ * an unrelated hue. This is operational software used at a competition
+ * ground, so the design favours contrast, density and calm over decoration.
  */
 @theme {
-  --color-brand-50: #ecf7fa;
-  --color-brand-100: #d0ecf3;
-  --color-brand-200: #a3d9e8;
-  --color-brand-300: #6cc0d7;
-  --color-brand-400: #33a1bf;
-  --color-brand-500: #0a82a4;
-  --color-brand-600: #00718f;
-  --color-brand-700: #015b74;
-  --color-brand-800: #084a5e;
-  --color-brand-900: #0c3d4e;
-  --color-brand-950: #052733;
+  --color-brand-50: #fbf7ee;
+  --color-brand-100: #f5ead2;
+  --color-brand-200: #e9d2a0;
+  --color-brand-300: #dab772;
+  --color-brand-400: #c89a4e;
+  --color-brand-500: #b17f3a;
+  --color-brand-600: #93682e;
+  --color-brand-700: #765225;
+  --color-brand-800: #5f421f;
+  --color-brand-900: #4a331a;
+  --color-brand-950: #2b1d0f;
 
   --color-gold-50: #faf7f1;
   --color-gold-100: #f2ead9;

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ItpfLogo } from "@/components/common/itpf-logo";
+import { AiaLogo } from "@/components/common/aia-logo";
 import { LocaleSwitcher, ThemeToggle } from "@/components/layout/toolbar";
 import { getTranslator } from "@/lib/i18n/server";
 
@@ -29,7 +29,7 @@ export default async function PublicLayout({ children }: { children: React.React
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
           <Link href="/results" className="flex min-w-0 items-center gap-2.5 rounded-md">
-            <ItpfLogo width={40} priority />
+            <AiaLogo width={40} priority />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">
                 {t("common.appNameShort")}

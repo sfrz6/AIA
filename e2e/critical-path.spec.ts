@@ -77,7 +77,7 @@ test("create a championship from the template", async ({ page }) => {
   await page.getByLabel("Organizer").fill("Royal Jordanian Equestrian Federation");
   await page.getByRole("button", { name: "Next" }).click();
 
-  // Step 3: countries.
+  // Step 3: clubs.
   await page.getByLabel("Search").fill("Jordan");
   await page.getByRole("checkbox").first().check();
   await page.getByLabel("Search").fill("Oman");
@@ -85,28 +85,28 @@ test("create a championship from the template", async ({ page }) => {
   await expect(page.getByText("2 selected")).toBeVisible();
   await page.getByRole("button", { name: "Next" }).click();
 
-  // Step 4: squads. Each country is an accordion, so it has to be opened before
-  // its riders can be nominated. Each country is seeded with four riders, so the
+  // Step 4: squads. Each club is an accordion, so it has to be opened before
+  // its riders can be nominated. Each club is seeded with four riders, so the
   // fifth is added here, which exercises the "add rider" path in the wizard.
-  for (const country of ["Jordan", "Oman"] as const) {
-    const prefix = country === "Jordan" ? "JO" : "OM";
+  for (const club of ["Jordan", "Oman"] as const) {
+    const prefix = club === "Jordan" ? "JO" : "OM";
 
-    await page.getByRole("button", { name: new RegExp(`^${country}`) }).click();
+    await page.getByRole("button", { name: new RegExp(`^${club}`) }).click();
     await expect(page.getByLabel("Rider name")).toBeVisible();
 
     await page.getByLabel("Rider name").fill(`${prefix} Reserve Rider`);
     await page.getByRole("button", { name: "Add rider" }).click();
-    await expect(page.getByLabel(`${prefix} Reserve Rider, ${country}`)).toBeVisible();
+    await expect(page.getByLabel(`${prefix} Reserve Rider, ${club}`)).toBeVisible();
 
     for (let position = 1; position <= 4; position += 1) {
       await page
-        .getByLabel(`${prefix} Rider ${position}, ${country}`)
+        .getByLabel(`${prefix} Rider ${position}, ${club}`)
         .selectOption(String(position));
     }
-    await page.getByLabel(`${prefix} Reserve Rider, ${country}`).selectOption("RESERVE");
+    await page.getByLabel(`${prefix} Reserve Rider, ${club}`).selectOption("RESERVE");
 
-    // Collapse it again so the next country's controls are unambiguous.
-    await page.getByRole("button", { name: new RegExp(`^${country}`) }).click();
+    // Collapse it again so the next club's controls are unambiguous.
+    await page.getByRole("button", { name: new RegExp(`^${club}`) }).click();
   }
 
   await page.getByRole("button", { name: "Next" }).click();
@@ -158,14 +158,14 @@ test("confirm the entry orders, print the sheet, and start the run", async ({ pa
   await signIn(page);
   await openFirstRun(page);
 
-  await expect(page.getByText("0 of 2 countries confirmed")).toBeVisible();
+  await expect(page.getByText("0 of 2 clubs confirmed")).toBeVisible();
 
-  // Every country needs an explicit decision; nothing is assumed.
+  // Every club needs an explicit decision; nothing is assumed.
   const confirmButtons = page.getByRole("button", { name: "Confirm", exact: true });
   await confirmButtons.first().click();
-  await expect(page.getByText("1 of 2 countries confirmed")).toBeVisible();
+  await expect(page.getByText("1 of 2 clubs confirmed")).toBeVisible();
   await page.getByRole("button", { name: "Confirm", exact: true }).first().click();
-  await expect(page.getByText("2 of 2 countries confirmed")).toBeVisible();
+  await expect(page.getByText("2 of 2 clubs confirmed")).toBeVisible();
 
   await expect(page.getByText("Ready to start")).toBeVisible();
   await expect(page.getByRole("link", { name: "Print round sheet" })).toBeVisible();
@@ -185,7 +185,7 @@ test("the printed round sheet matches the confirmed entry order", async ({ page,
   await sheet.goto(href!);
 
   await expect(sheet.getByText("Round sheet")).toBeVisible();
-  await expect(sheet.getByText("International Tent Pegging Federation")).toBeVisible();
+  await expect(sheet.getByText("Assayel International Academy")).toBeVisible();
   await expect(sheet.getByText("Individual Lance")).toBeVisible();
   // The first rider of each squad, in the confirmed order.
   await expect(sheet.getByText("JO Rider 1")).toBeVisible();
@@ -256,7 +256,7 @@ test("an unconfirmed run stays out of the standings", async ({ page }) => {
 
   await championshipTab(page, "Results").click();
   await page
-    .getByRole("radiogroup", { name: "Show individual or country standings" })
+    .getByRole("radiogroup", { name: "Show individual or club standings" })
     .getByRole("radio", { name: "Individual" })
     .click();
 

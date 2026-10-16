@@ -7,7 +7,7 @@ import { getChampionshipDetail } from "@/server/services/championships";
 import { loadChampionshipResults } from "@/server/services/results";
 import { EmptyState } from "@/components/ui/surfaces";
 import {
-  activeRidersByCountry,
+  activeRidersByClub,
   buildStandingsData,
   pdfAvailability,
   storedTieBreakEntries,
@@ -55,7 +55,7 @@ export default async function ChampionshipResultsPage({
       days={days}
       sets={sets}
       canManageTieBreaks={hasPermission(principal, "MANAGE_TIE_BREAKS")}
-      activeRiders={activeRidersByCountry(results.directory)}
+      activeRiders={activeRidersByClub(results.directory)}
       storedRounds={storedTieBreakEntries(results.tieBreaks)}
       pdfAvailable={pdfAvailable}
     />

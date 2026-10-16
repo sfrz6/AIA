@@ -1,13 +1,14 @@
-# ITPF Competition System
+# AIA Competition System
 
-Official competition management and scoring for International Tent Pegging
-Federation championships.
+Official competition management and scoring for Assayel International Academy
+championships.
 
-The system runs a three day championship end to end: reusable championship
-templates, the permanent country and rider registry, championship squads, entry
-orders confirmed before every run, scoring, run confirmation, audited
-corrections of confirmed results, individual and country standings, printed
-round sheets for the manual referee, and a public results area.
+The system runs a championship end to end: reusable championship templates
+(one to three competition days, however many the template actually uses), the
+permanent club and rider registry, championship squads, entry orders
+confirmed before every run, scoring, run confirmation, audited corrections of
+confirmed results, individual and club standings, printed round sheets for
+the manual referee, and a public results area.
 
 Scoring reproduces the federation's existing Excel workbook exactly. The mapping
 from every workbook formula to the implementation, and every inconsistency found
@@ -62,10 +63,9 @@ src/
   lib/
     auth/           password hashing, sessions, authorization guards
     i18n/           dictionaries and the locale runtime
-    countries/      ISO registry seed data and flag resolution
   components/
     ui/             the design system primitives
-    common/         logo, flags, formatting, shared labels
+    common/         logo, formatting, shared labels
     layout/         application shell, theme and locale controls
 ```
 
@@ -88,18 +88,24 @@ src/
   every read, so a correction propagates everywhere the moment it commits.
 - **Authorization is server side.** Hiding a button is a convenience. Every
   protected action re-checks the capability after validating its input.
-- **A squad is either complete or empty, never half picked.** A country can be
+- **A squad is either complete or empty, never half picked.** A club can be
   added to a championship with its four active riders and one reserve decided
   on the spot, or with none at all, to be filled in later from the
   Participants page. Either state is valid; anything in between is refused,
   because it has no sensible meaning for the entry order screen.
-- **The country start list order is editable until the competition actually
+- **The club start list order is editable until the competition actually
   starts.** `hasChampionshipStarted` checks the championship's first run, not
-  each country's own first run, because the start list is a property of the
-  whole competition. `reorderChampionshipCountries` moves every row to a
+  each club's own first run, because the start list is a property of the
+  whole competition. `reorderChampionshipClubs` moves every row to a
   disjoint negative range before writing the final order, because the unique
   index on `(championship, order)` is checked per statement, not deferred to
   the end of the transaction.
+- **A championship's day count comes from its template, not a fixed number.**
+  `createChampionshipFromTemplate` creates one championship day per template
+  day that actually holds an event, so a template built for a single-day
+  event produces a single-day championship rather than padding it out to
+  three days with two left empty. A template may still define at most three
+  days.
 
 ---
 
@@ -116,7 +122,6 @@ Fill in `.env.local`, then:
 
 ```bash
 npm run db:migrate
-npm run db:seed
 npm run db:bootstrap-admin
 npm run dev
 ```
@@ -125,11 +130,15 @@ The application is on <http://localhost:3000>. Sign in with the administrator
 you just created, then change that password and remove
 `BOOTSTRAP_ADMIN_PASSWORD` from the environment.
 
+There is no fixed club registry to seed: a club is created from the Clubs
+page by name only (an optional Arabic name, no flag or logo), by anyone with
+the `MANAGE_RIDERS` capability.
+
 ### Demo data
 
 Building a championship by hand takes a while, so there is a command that
 creates one to explore: the full three day structure from the reference
-workbook, four countries, twenty riders, and the opening Individual Lance run
+workbook, four clubs, twenty riders, and the opening Individual Lance run
 already scored and confirmed.
 
 ```bash
@@ -140,14 +149,13 @@ Everything it creates is prefixed `Demo:`. To start over:
 
 ```bash
 npm run db:reset        # empties every table, asks for confirmation first
-npm run db:seed
 npm run db:bootstrap-admin
 ```
 
 A local PostgreSQL via Docker, if you need one:
 
 ```bash
-docker run -d --name itpf-postgres -e POSTGRES_USER=itpf -e POSTGRES_PASSWORD=itpf_dev -e POSTGRES_DB=itpf -p 5437:5432 postgres:17-alpine
+docker run -d --name aia-postgres -e POSTGRES_USER=aia -e POSTGRES_PASSWORD=aia_dev -e POSTGRES_DB=aia -p 5437:5432 postgres:17-alpine
 ```
 
 ---
@@ -186,11 +194,7 @@ Migrations are generated from the Drizzle schema and applied in order.
 npm run db:generate     # after changing src/db/schema, writes SQL to src/db/migrations
 npm run db:migrate      # apply pending migrations to DATABASE_URL
 npm run db:migrate -- --test   # apply them to TEST_DATABASE_URL instead
-npm run db:seed         # seed the ISO country registry, safe to repeat
 ```
-
-`db:seed` is idempotent: an existing country keeps its identity and only its
-display names refresh, so championship history is never orphaned.
 
 ### Where the integrity rules actually live
 
@@ -201,7 +205,7 @@ The database enforces the rules that matter, not only the forms:
 - a score is 0, 2, 4 or 6, or not recorded
 - a run is confirmed if and only if it carries a confirmation timestamp
 - a correction carries a non-empty reason
-- a championship day is 1, 2 or 3
+- a template day, or a championship day, is 1, 2 or 3
 
 ---
 
@@ -214,8 +218,8 @@ The database enforces the rules that matter, not only the forms:
 2. Set `DATABASE_URL` to it, including `?sslmode=require`.
 3. Leave `DATABASE_DRIVER` empty; a Neon host selects the serverless driver
    automatically.
-4. Run `npm run db:migrate` and `npm run db:seed` against it once, from your own
-   machine, before the first deployment.
+4. Run `npm run db:migrate` against it once, from your own machine, before the
+   first deployment.
 
 ### Vercel
 
@@ -248,7 +252,6 @@ should be an explicit, observed step.
 | `npm run test:e2e` | Playwright, building and starting the app first. |
 | `npm run db:generate` | Generate a migration from the schema. |
 | `npm run db:migrate` | Apply migrations. |
-| `npm run db:seed` | Seed the country registry. |
 | `npm run db:seed-demo` | Create a championship to explore, with one run already confirmed. |
 | `npm run db:bootstrap-admin` | Create the first administrator. |
 | `npm run db:reset` | Empty every table on a local or test database. |
@@ -309,9 +312,9 @@ that can create users, deactivate or reactivate them, or change permissions.
 | `MANAGE_TEMPLATES` | Create, edit, duplicate and archive championship templates. |
 | `CREATE_CHAMPIONSHIP` | Run the creation wizard. |
 | `EDIT_CHAMPIONSHIP` | Change a championship's name, location, organizer and status. |
-| `MANAGE_CHAMPIONSHIP_COUNTRIES` | Add or remove participating countries. |
-| `MANAGE_RIDERS` | Maintain the rider registry and championship squads. |
-| `MANAGE_ENTRY_ORDERS` | Record each country's entry order decision before a run. |
+| `MANAGE_CHAMPIONSHIP_CLUBS` | Add or remove participating clubs. |
+| `MANAGE_RIDERS` | Maintain the rider registry, club registry and championship squads. |
+| `MANAGE_ENTRY_ORDERS` | Record each club's entry order decision before a run. |
 | `ENTER_SCORES` | Start a run and record scores and times. |
 | `CONFIRM_RUNS` | Publish a run into the official standings. |
 | `EDIT_CONFIRMED_RESULTS` | Correct a confirmed run, with a mandatory reason. |
@@ -351,12 +354,12 @@ matters most:
 | --- | --- | --- |
 | Individual Lance, Individual Sword | one rider | the rider |
 | Rings and Peg, Lemons and Peg | one rider, three targets | the rider |
-| Pair Lance, Pair Sword | two riders, entry positions 1 and 2, then 3 and 4 | the country |
-| Team Lance, Team Sword | four riders | the country |
-| Relay Lance, Relay Sword | four riders | the country |
+| Pair Lance, Pair Sword | two riders, entry positions 1 and 2, then 3 and 4 | the club |
+| Team Lance, Team Sword | four riders | the club |
+| Relay Lance, Relay Sword | four riders | the club |
 
 So a rider's individual total is net of their own time faults but carries their
-**raw** points from pair, team and relay events; the country total is the sum of
+**raw** points from pair, team and relay events; the club total is the sum of
 its riders' totals plus those shared faults.
 
 Equal totals share a rank and the next rank is skipped. A tie is either resolved
@@ -370,18 +373,25 @@ assumes that Individual Lance has two runs or that run 1 is 6 cm.
 
 ## Branding and languages
 
-The two supplied federation logos are used unmodified, in
-`public/brand/`: `itpf-logo-light.webp` for light backgrounds and
-`itpf-logo-dark.png` for dark ones. The originals remain in `logos/`. Both are
-rendered and swapped with CSS rather than JavaScript, so the correct one is on
-screen at first paint and the theme never flashes.
+The Assayel International Academy mark is used unmodified, as a single
+transparent gold logo at `public/brand/aia-logo.png`. Unlike the previous
+federation mark it needs no separate light/dark variant: the gold reads
+cleanly on both a light and a dark surface, so `AiaLogo` /
+`AiaLogoPrint` (`src/components/common/aia-logo.tsx`) render the one file.
 
-The palette is derived from the logo: the teal of the horse mark (`#00718F`) and
-the gold of the lance and wordmark (`#8D744A`) over a cool near-navy neutral
-ramp. Light and dark themes both follow the system preference by default.
+The palette is derived from that logo: a warm gold (`#93682E` at its mid
+tone) over a cool near-navy neutral ramp, defined in `src/app/globals.css`.
+Components consume semantic tokens (`--color-primary`, `--color-accent`, ...)
+rather than raw hex values, so the whole interface recolours from one place.
+Light and dark themes both follow the system preference by default.
 
-Country flags are rendered from the ISO 3166-1 alpha-2 code, as local SVG files
-under `public/flags/`. No external image URL is stored against a country.
+Printed round sheets and standings PDFs (`src/app/(print)/`,
+`src/app/(public-print)/`) carry the academy logo top left and the Oman
+Equestrian and Racing Federation's logo (`public/brand/oman-federation-logo.png`)
+top right, above the document title.
+
+A club has no flag or logo: it is a name only (with an optional Arabic
+name), entered from the Clubs page.
 
 The interface is fully translated into English and Arabic, with right to left
 layout for Arabic. `src/lib/i18n/dictionaries/en.ts` is the source of truth, and
@@ -404,7 +414,7 @@ every route working in both languages without duplicating the route tree.
   removed.
 - Every server action authorizes on the server after validating its input with
   Zod. Identifiers from the browser are checked to belong to the run,
-  championship or country being acted on; they are never trusted.
+  championship or club being acted on; they are never trusted.
 - Runs carry a version. Saving against a stale version is refused with a
   conflict message rather than silently overwriting a colleague's work.
 - Confirmation, correction and recalculation run inside a single transaction, so
@@ -422,11 +432,11 @@ every route working in both languages without duplicating the route tree.
 ## Designed for Version 2
 
 Version 1 deliberately does not implement historical rankings, cumulative
-points, rider profiles or country profiles. The data model is already shaped for
+points, rider profiles or club profiles. The data model is already shaped for
 them:
 
-- A **country** is a permanent entity with a stable identity.
-- A **rider** belongs permanently to a country and keeps one identity across
+- A **club** is a permanent entity with a stable identity.
+- A **rider** belongs permanently to a club and keeps one identity across
   championships. There is no team entity that owns riders.
 - Active or reserve is a property of a **participation**, not of a rider, so the
   same rider can be active in one championship and reserve in the next.

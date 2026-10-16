@@ -5,16 +5,15 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form-controls";
 import { Badge, Callout } from "@/components/ui/surfaces";
-import { CountryLabel } from "@/components/common/country-flag";
 import {
-  ACTIVE_RIDERS_PER_COUNTRY,
-  RESERVE_RIDERS_PER_COUNTRY,
+  ACTIVE_RIDERS_PER_CLUB,
+  RESERVE_RIDERS_PER_CLUB,
 } from "@/domain/scoring/event-types";
 import { useI18n } from "@/lib/i18n/client";
 import type { Translator } from "@/lib/i18n";
 import { createRiderAction } from "@/server/actions/riders";
 
-/** A rider on a country's permanent registry, as the picker needs it. */
+/** A rider on a club's permanent registry, as the picker needs it. */
 export interface SquadRiderOption {
   readonly id: string;
   readonly fullName: string;
@@ -34,7 +33,7 @@ export type SquadSlot = number | typeof RESERVE_SLOT;
 export type SquadSelection = Readonly<Record<string, SquadSlot>>;
 
 export const ACTIVE_POSITIONS: readonly number[] = Array.from(
-  { length: ACTIVE_RIDERS_PER_COUNTRY },
+  { length: ACTIVE_RIDERS_PER_CLUB },
   (_, index) => index + 1,
 );
 
@@ -52,8 +51,8 @@ export function countReserve(value: SquadSelection): number {
 
 export function isSquadComplete(value: SquadSelection): boolean {
   return (
-    countActive(value) === ACTIVE_RIDERS_PER_COUNTRY &&
-    countReserve(value) === RESERVE_RIDERS_PER_COUNTRY
+    countActive(value) === ACTIVE_RIDERS_PER_CLUB &&
+    countReserve(value) === RESERVE_RIDERS_PER_CLUB
   );
 }
 
@@ -81,10 +80,10 @@ export function isSquadSavable(value: SquadSelection): boolean {
 export function squadIssues(value: SquadSelection, t: Translator): readonly string[] {
   if (isSquadEmpty(value)) return [];
   const issues: string[] = [];
-  if (countActive(value) !== ACTIVE_RIDERS_PER_COUNTRY) {
+  if (countActive(value) !== ACTIVE_RIDERS_PER_CLUB) {
     issues.push(t("championships.needFourActive"));
   }
-  if (countReserve(value) !== RESERVE_RIDERS_PER_COUNTRY) {
+  if (countReserve(value) !== RESERVE_RIDERS_PER_CLUB) {
     issues.push(t("championships.needOneReserve"));
   }
   return issues;
@@ -142,9 +141,8 @@ function parseSlot(raw: string): SquadSlot | null {
 }
 
 export interface SquadPickerProps {
-  readonly countryId: string;
-  readonly countryName: string;
-  readonly iso2: string;
+  readonly clubId: string;
+  readonly clubName: string;
   readonly riders: readonly SquadRiderOption[];
   readonly value: SquadSelection;
   readonly onChange: (value: SquadSelection) => void;
@@ -152,7 +150,7 @@ export interface SquadPickerProps {
 }
 
 /**
- * Nominates one country's squad: four active riders in starting order plus one
+ * Nominates one club's squad: four active riders in starting order plus one
  * reserve.
  *
  * A place already taken is offered as disabled rather than hidden, so two
@@ -161,9 +159,8 @@ export interface SquadPickerProps {
  * revalidates the squad in every case.
  */
 export function SquadPicker({
-  countryId,
-  countryName,
-  iso2,
+  clubId,
+  clubName,
   riders,
   value,
   onChange,
@@ -203,7 +200,7 @@ export function SquadPicker({
     if (!fullName) return;
     setAddError(null);
     startTransition(async () => {
-      const result = await createRiderAction({ countryId, fullName });
+      const result = await createRiderAction({ clubId, fullName });
       if (!result.ok) {
         setAddError(result.error);
         return;
@@ -217,12 +214,12 @@ export function SquadPicker({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <CountryLabel iso2={iso2} name={countryName} size="md" className="min-w-0 flex-1 text-sm font-medium" />
-        <Badge tone={countActive(value) === ACTIVE_RIDERS_PER_COUNTRY ? "success" : "outline"}>
-          {t("championships.activeRiders")} {countActive(value)}/{ACTIVE_RIDERS_PER_COUNTRY}
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{clubName}</span>
+        <Badge tone={countActive(value) === ACTIVE_RIDERS_PER_CLUB ? "success" : "outline"}>
+          {t("championships.activeRiders")} {countActive(value)}/{ACTIVE_RIDERS_PER_CLUB}
         </Badge>
-        <Badge tone={countReserve(value) === RESERVE_RIDERS_PER_COUNTRY ? "success" : "outline"}>
-          {t("championships.reserveRider")} {countReserve(value)}/{RESERVE_RIDERS_PER_COUNTRY}
+        <Badge tone={countReserve(value) === RESERVE_RIDERS_PER_CLUB ? "success" : "outline"}>
+          {t("championships.reserveRider")} {countReserve(value)}/{RESERVE_RIDERS_PER_CLUB}
         </Badge>
       </div>
 
@@ -240,7 +237,7 @@ export function SquadPicker({
                 <span className="min-w-0 flex-1 truncate text-sm">{rider.fullName}</span>
                 <div className="w-full sm:w-40">
                   <Select
-                    aria-label={`${rider.fullName}, ${countryName}`}
+                    aria-label={`${rider.fullName}, ${clubName}`}
                     value={slot === undefined ? "" : String(slot)}
                     onChange={(event) => select(rider.id, event.target.value)}
                   >
@@ -291,12 +288,12 @@ export function SquadPicker({
       <form onSubmit={addRider} className="flex flex-wrap items-end gap-2">
         <Field
           label={t("championships.riderName")}
-          htmlFor={`squad-new-rider-${countryId}`}
+          htmlFor={`squad-new-rider-${clubId}`}
           error={addError}
           className="min-w-0 flex-1"
         >
           <Input
-            id={`squad-new-rider-${countryId}`}
+            id={`squad-new-rider-${clubId}`}
             ref={inputRef}
             value={newName}
             onChange={(event) => setNewName(event.target.value)}

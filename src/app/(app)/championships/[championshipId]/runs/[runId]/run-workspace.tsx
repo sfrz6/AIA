@@ -38,14 +38,14 @@ import {
 } from "@/server/actions/runs";
 import {
   EntryOrderPanel,
-  type EntryOrderCountry,
+  type EntryOrderClub,
 } from "./entry-order-panel";
 import {
   ScoringGrid,
   buildDraft,
   draftToPayload,
   isDraftComplete,
-  type ScoringCountry,
+  type ScoringClub,
   type ScoringDraft,
 } from "./scoring-grid";
 
@@ -84,7 +84,7 @@ export function RunWorkspace({
   run,
   entryOrder,
   scoring,
-  confirmedDayTotalByCountry,
+  confirmedDayTotalByClub,
   revisions,
   permissions,
   navigation,
@@ -92,14 +92,14 @@ export function RunWorkspace({
   championshipId: string;
   run: RunSummary;
   entryOrder: {
-    countries: readonly EntryOrderCountry[];
+    clubs: readonly EntryOrderClub[];
     confirmedCount: number;
     totalCount: number;
     allConfirmed: boolean;
   };
-  scoring: readonly ScoringCountry[];
-  /** Every other confirmed run's contribution today, per country, so the day total can be shown live. */
-  confirmedDayTotalByCountry: Readonly<Record<string, string>>;
+  scoring: readonly ScoringClub[];
+  /** Every other confirmed run's contribution today, per club, so the day total can be shown live. */
+  confirmedDayTotalByClub: Readonly<Record<string, string>>;
   revisions: readonly RunRevisionSummary[];
   permissions: RunPermissions;
   navigation: { previousRunId: string | null; nextRunId: string | null };
@@ -133,13 +133,13 @@ export function RunWorkspace({
   const isConfirmed = run.status === "CONFIRMED";
   const isScoring = run.status === "IN_PROGRESS" || run.status === "REVIEW";
   const isEntryOrderStage = run.status === "ENTRY_ORDER_PENDING" || run.status === "READY";
-  // A country can be late submitting its final lineup, so the order stays
+  // A club can be late submitting its final lineup, so the order stays
   // editable into scoring too, right up until the first score is saved.
   const entryOrderStillEditable =
     run.runNumber === 1 && run.status === "IN_PROGRESS" && !run.scoresSaved;
   const showEntryOrderPanel = isEntryOrderStage || entryOrderStillEditable;
-  // Readiness is taken from the live count of confirmed countries rather than
-  // from the stored status, which can lag when two countries are confirmed at
+  // Readiness is taken from the live count of confirmed clubs rather than
+  // from the stored status, which can lag when two clubs are confirmed at
   // the same moment. The server applies the same rule.
   const readyToStart = isEntryOrderStage && entryOrder.allConfirmed;
 
@@ -282,7 +282,7 @@ export function RunWorkspace({
         <EntryOrderPanel
           championshipId={championshipId}
           runId={run.runId}
-          countries={entryOrder.countries}
+          clubs={entryOrder.clubs}
           confirmedCount={entryOrder.confirmedCount}
           totalCount={entryOrder.totalCount}
           canManage={permissions.manageEntryOrders && run.runNumber === 1}
@@ -375,11 +375,11 @@ export function RunWorkspace({
           <ScoringGrid
             eventType={run.eventType}
             timeLimitSeconds={run.timeLimitSeconds}
-            countries={scoring}
+            clubs={scoring}
             draft={draft}
             onChange={setDraft}
             readOnly={isConfirmed ? !correcting : !permissions.enterScores}
-            confirmedDayTotalByCountry={confirmedDayTotalByCountry}
+            confirmedDayTotalByClub={confirmedDayTotalByClub}
           />
         </section>
       ) : null}

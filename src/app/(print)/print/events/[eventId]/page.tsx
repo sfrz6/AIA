@@ -8,8 +8,7 @@ import { getEventPrintState } from "@/server/services/runs";
 import { formatCompetitionDate, formatPegSize, formatTime } from "@/components/common/formatting";
 import { eventLabel } from "@/components/common/labels";
 import { targetLabels } from "@/components/common/target-labels";
-import { CountryFlag } from "@/components/common/country-flag";
-import { ItpfLogoPrint } from "@/components/common/itpf-logo";
+import { AiaLogoPrint, OmanFederationLogoPrint } from "@/components/common/aia-logo";
 import { PrintTrigger } from "@/components/common/print-trigger";
 
 export const metadata = { title: "Round sheet" };
@@ -42,7 +41,7 @@ export default async function EventRoundSheetPage({
 
       <header className="mb-4 flex items-start justify-between gap-6 border-b-2 border-black pb-3">
         <div className="flex items-start gap-4">
-          <ItpfLogoPrint width={96} />
+          <AiaLogoPrint width={96} />
           <div>
             <p className="text-[10pt] font-semibold uppercase tracking-wide">
               {t("common.federation")}
@@ -56,7 +55,8 @@ export default async function EventRoundSheetPage({
             </p>
           </div>
         </div>
-        <div className="text-end text-[9pt]">
+        <div className="flex flex-col items-end gap-1 text-end text-[9pt]">
+          <OmanFederationLogoPrint width={64} />
           <p className="text-[11pt] font-bold">{t("print.roundSheet")}</p>
           <p>{t("championships.daysOf", { day: state.dayNumber })}</p>
           <p className="numeric">{formatCompetitionDate(state.competitionDate, locale)}</p>
@@ -93,33 +93,32 @@ export default async function EventRoundSheetPage({
       </section>
 
       <div className="space-y-4">
-        {state.countries.map((country) => {
+        {state.clubs.map((club) => {
           const names = new Map(
-            country.roster.map((member) => [member.championshipRiderId, member.fullName]),
+            club.roster.map((member) => [member.championshipRiderId, member.fullName]),
           );
           const units = buildScoringUnits(
-            country.confirmedOrder,
+            club.confirmedOrder,
             definition.ridersPerScoringUnit,
           );
 
           return (
             <section
-              key={country.championshipCountryId}
+              key={club.championshipClubId}
               className="print-avoid-break border border-black"
             >
               <h2 className="flex items-center gap-2 border-b border-black bg-neutral-100 px-2 py-1 text-[10pt] font-bold">
-                <CountryFlag iso2={country.iso2} size="sm" />
-                {country.countryName}
+                {club.clubName}
                 <span className="ms-auto text-[8pt] font-normal">
-                  {country.decision === "CHANGED"
+                  {club.decision === "CHANGED"
                     ? t("runs.changeOrder")
-                    : country.decision === "NO_CHANGE"
+                    : club.decision === "NO_CHANGE"
                       ? t("runs.noChange")
                       : t("runs.notReviewed")}
                 </span>
               </h2>
 
-              {country.confirmedOrder.length === 0 ? (
+              {club.confirmedOrder.length === 0 ? (
                 <p className="px-2 py-3 text-[9pt]">{t("runs.notReviewed")}</p>
               ) : (
                 <table className="w-full border-collapse text-[9pt]">

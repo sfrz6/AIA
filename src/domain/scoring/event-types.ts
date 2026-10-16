@@ -13,14 +13,14 @@ import { Decimal } from "./decimal";
  *
  * For INDIVIDUAL and MULTI_TARGET the penalty reduces the rider's own score, so
  * it is already part of the rider's individual total. For PAIR, TEAM and RELAY
- * the penalty belongs to the country: the rider contributes raw points to the
- * individual standings and the penalty is applied once to the country total.
+ * the penalty belongs to the club: the rider contributes raw points to the
+ * individual standings and the penalty is applied once to the club total.
  * This mirrors the reference workbook exactly (see SCORING_AUDIT.md).
  */
 export type ScoringRuleType = "INDIVIDUAL" | "MULTI_TARGET" | "PAIR" | "TEAM" | "RELAY";
 
-/** Whether the penalty is carried by the rider or by the country. */
-export type PenaltyAttribution = "RIDER" | "COUNTRY";
+/** Whether the penalty is carried by the rider or by the club. */
+export type PenaltyAttribution = "RIDER" | "CLUB";
 
 export type Discipline = "LANCE" | "SWORD";
 
@@ -45,8 +45,8 @@ export interface EventTypeDefinition {
   readonly discipline: Discipline;
   /** Riders that form one scoring unit (one shared time). */
   readonly ridersPerScoringUnit: number;
-  /** Scoring units fielded by each country in a single run. */
-  readonly unitsPerCountry: number;
+  /** Scoring units fielded by each club in a single run. */
+  readonly unitsPerClub: number;
   /** Scoreable targets each rider attempts in one run. */
   readonly targetsPerRider: number;
   /** Default time limit in seconds before penalties start, from the workbook. */
@@ -55,12 +55,12 @@ export interface EventTypeDefinition {
   readonly defaultPegSizesCm: readonly string[];
 }
 
-/** Riders each country fields in a run of any event in this system: 4 active. */
-export const RIDERS_PER_COUNTRY_PER_RUN = 4;
+/** Riders each club fields in a run of any event in this system: 4 active. */
+export const RIDERS_PER_CLUB_PER_RUN = 4;
 
-/** Championship roster size per country: 4 active riders plus 1 reserve. */
-export const ACTIVE_RIDERS_PER_COUNTRY = 4;
-export const RESERVE_RIDERS_PER_COUNTRY = 1;
+/** Championship roster size per club: 4 active riders plus 1 reserve. */
+export const ACTIVE_RIDERS_PER_CLUB = 4;
+export const RESERVE_RIDERS_PER_CLUB = 1;
 
 /** The only point values a referee may award for a single target. */
 export const ALLOWED_TARGET_POINTS = [0, 2, 4, 6] as const;
@@ -75,7 +75,7 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     ruleType: "INDIVIDUAL",
     discipline: "LANCE",
     ridersPerScoringUnit: 1,
-    unitsPerCountry: RIDERS_PER_COUNTRY_PER_RUN,
+    unitsPerClub: RIDERS_PER_CLUB_PER_RUN,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "6.40",
     defaultPegSizesCm: ["6", "4"],
@@ -85,7 +85,7 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     ruleType: "INDIVIDUAL",
     discipline: "SWORD",
     ridersPerScoringUnit: 1,
-    unitsPerCountry: RIDERS_PER_COUNTRY_PER_RUN,
+    unitsPerClub: RIDERS_PER_CLUB_PER_RUN,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "6.40",
     defaultPegSizesCm: ["6", "4"],
@@ -95,7 +95,7 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     ruleType: "PAIR",
     discipline: "LANCE",
     ridersPerScoringUnit: 2,
-    unitsPerCountry: 2,
+    unitsPerClub: 2,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "7.00",
     defaultPegSizesCm: ["6", "4"],
@@ -105,7 +105,7 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     ruleType: "PAIR",
     discipline: "SWORD",
     ridersPerScoringUnit: 2,
-    unitsPerCountry: 2,
+    unitsPerClub: 2,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "7.00",
     defaultPegSizesCm: ["6", "4"],
@@ -114,8 +114,8 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     key: "TEAM_LANCE",
     ruleType: "TEAM",
     discipline: "LANCE",
-    ridersPerScoringUnit: RIDERS_PER_COUNTRY_PER_RUN,
-    unitsPerCountry: 1,
+    ridersPerScoringUnit: RIDERS_PER_CLUB_PER_RUN,
+    unitsPerClub: 1,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "7.00",
     defaultPegSizesCm: ["6", "4", "4"],
@@ -124,8 +124,8 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     key: "TEAM_SWORD",
     ruleType: "TEAM",
     discipline: "SWORD",
-    ridersPerScoringUnit: RIDERS_PER_COUNTRY_PER_RUN,
-    unitsPerCountry: 1,
+    ridersPerScoringUnit: RIDERS_PER_CLUB_PER_RUN,
+    unitsPerClub: 1,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "7.00",
     defaultPegSizesCm: ["6", "4", "4"],
@@ -135,7 +135,7 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     ruleType: "MULTI_TARGET",
     discipline: "LANCE",
     ridersPerScoringUnit: 1,
-    unitsPerCountry: RIDERS_PER_COUNTRY_PER_RUN,
+    unitsPerClub: RIDERS_PER_CLUB_PER_RUN,
     targetsPerRider: 3,
     defaultTimeLimitSeconds: "7.00",
     defaultPegSizesCm: ["6", "4"],
@@ -145,7 +145,7 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     ruleType: "MULTI_TARGET",
     discipline: "SWORD",
     ridersPerScoringUnit: 1,
-    unitsPerCountry: RIDERS_PER_COUNTRY_PER_RUN,
+    unitsPerClub: RIDERS_PER_CLUB_PER_RUN,
     targetsPerRider: 3,
     defaultTimeLimitSeconds: "7.00",
     defaultPegSizesCm: ["6", "4"],
@@ -154,8 +154,8 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     key: "RELAY_LANCE",
     ruleType: "RELAY",
     discipline: "LANCE",
-    ridersPerScoringUnit: RIDERS_PER_COUNTRY_PER_RUN,
-    unitsPerCountry: 1,
+    ridersPerScoringUnit: RIDERS_PER_CLUB_PER_RUN,
+    unitsPerClub: 1,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "10.00",
     defaultPegSizesCm: ["6", "4"],
@@ -164,8 +164,8 @@ const DEFINITIONS: Record<EventTypeKey, EventTypeDefinition> = {
     key: "RELAY_SWORD",
     ruleType: "RELAY",
     discipline: "SWORD",
-    ridersPerScoringUnit: RIDERS_PER_COUNTRY_PER_RUN,
-    unitsPerCountry: 1,
+    ridersPerScoringUnit: RIDERS_PER_CLUB_PER_RUN,
+    unitsPerClub: 1,
     targetsPerRider: 1,
     defaultTimeLimitSeconds: "10.00",
     defaultPegSizesCm: ["6", "4"],
@@ -207,7 +207,7 @@ export const ALL_EVENT_TYPES: readonly EventTypeDefinition[] = EVENT_TYPE_KEYS.m
 );
 
 export function penaltyAttributionOf(ruleType: ScoringRuleType): PenaltyAttribution {
-  return ruleType === "INDIVIDUAL" || ruleType === "MULTI_TARGET" ? "RIDER" : "COUNTRY";
+  return ruleType === "INDIVIDUAL" || ruleType === "MULTI_TARGET" ? "RIDER" : "CLUB";
 }
 
 /**
@@ -223,11 +223,11 @@ export function maxUnitPoints(definition: EventTypeDefinition): Decimal {
 
 /**
  * Defaults for a tie-break round, called a round of draws in the reference
- * workbook, ridden at a reduced peg size to separate competitors or countries
+ * workbook, ridden at a reduced peg size to separate competitors or clubs
  * that are level on points.
  *
  * The individual round follows the individual event rule exactly: a 6.4 second
- * limit and a 6 point cap. The country round uses a 7 second limit, and the
+ * limit and a 6 point cap. The club round uses a 7 second limit, and the
  * workbook caps its penalty at 6 points even though four riders take part,
  * where the main team events cap at 24. That is reproduced here because it is
  * consistent across all four summary sheets, and it is stored per round so an
@@ -236,8 +236,8 @@ export function maxUnitPoints(definition: EventTypeDefinition): Decimal {
  */
 export const TIE_BREAK_DEFAULTS = {
   INDIVIDUAL: { pegSizeCm: "2.5", timeLimitSeconds: "6.40", maxPoints: "6" },
-  COUNTRY: { pegSizeCm: "2.5", timeLimitSeconds: "7.00", maxPoints: "6" },
+  CLUB: { pegSizeCm: "2.5", timeLimitSeconds: "7.00", maxPoints: "6" },
 } as const;
 
-/** Riders a country fields in a country tie-break round. */
-export const TIE_BREAK_RIDERS_PER_COUNTRY = RIDERS_PER_COUNTRY_PER_RUN;
+/** Riders a club fields in a club tie-break round. */
+export const TIE_BREAK_RIDERS_PER_CLUB = RIDERS_PER_CLUB_PER_RUN;

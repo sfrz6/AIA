@@ -41,24 +41,24 @@ export default async function RunPage({
   const nextRun = index >= 0 && index < runsInOrder.length - 1 ? runsInOrder[index + 1] : undefined;
 
   const run = entryOrderState.run;
-  const scoresSaved = (scoringState?.countries ?? []).some((country) =>
-    country.units.some(
+  const scoresSaved = (scoringState?.clubs ?? []).some((club) =>
+    club.units.some(
       (unit) =>
         unit.timeSeconds !== null || unit.riders.some((rider) => rider.targets.some((value) => value !== null)),
     ),
   );
 
   // Every other confirmed run of the day, across every event, so the
-  // scoring screen can show each country's day total updating live as this
+  // scoring screen can show each club's day total updating live as this
   // run is scored — excluding this run itself even once it is confirmed, so
   // adding its own live total next to it never double counts it.
   const otherConfirmedRunsToday = confirmedRuns.filter(
     (confirmed) => confirmed.runId !== runId && confirmed.dayNumber === run.dayNumber,
   );
   const confirmedDayTotals = aggregateChampionship(otherConfirmedRunsToday);
-  const confirmedDayTotalByCountry: Record<string, string> = {};
-  for (const [championshipCountryId, totals] of confirmedDayTotals.countries) {
-    confirmedDayTotalByCountry[championshipCountryId] = formatPoints(
+  const confirmedDayTotalByClub: Record<string, string> = {};
+  for (const [championshipClubId, totals] of confirmedDayTotals.clubs) {
+    confirmedDayTotalByClub[championshipClubId] = formatPoints(
       totals.byDay.get(run.dayNumber as DayNumber) ?? 0,
     );
   }
@@ -97,14 +97,13 @@ export default async function RunPage({
           scoresSaved,
         }}
         entryOrder={{
-          countries: entryOrderState.countries.map((country) => ({
-            championshipCountryId: country.championshipCountryId,
-            iso2: country.iso2,
-            countryName: country.countryName,
-            decision: country.decision,
-            previousOrder: [...country.previousOrder],
-            confirmedOrder: [...country.confirmedOrder],
-            roster: country.roster.map((member) => ({
+          clubs: entryOrderState.clubs.map((club) => ({
+            championshipClubId: club.championshipClubId,
+            clubName: club.clubName,
+            decision: club.decision,
+            previousOrder: [...club.previousOrder],
+            confirmedOrder: [...club.confirmedOrder],
+            roster: club.roster.map((member) => ({
               championshipRiderId: member.championshipRiderId,
               fullName: member.fullName,
               rosterSlot: member.rosterSlot,
@@ -115,14 +114,13 @@ export default async function RunPage({
           totalCount: entryOrderState.totalCount,
           allConfirmed: entryOrderState.allConfirmed,
         }}
-        confirmedDayTotalByCountry={confirmedDayTotalByCountry}
+        confirmedDayTotalByClub={confirmedDayTotalByClub}
         scoring={
           scoringState
-            ? scoringState.countries.map((country) => ({
-                championshipCountryId: country.championshipCountryId,
-                iso2: country.iso2,
-                countryName: country.countryName,
-                units: country.units.map((unit) => ({
+            ? scoringState.clubs.map((club) => ({
+                championshipClubId: club.championshipClubId,
+                clubName: club.clubName,
+                units: club.units.map((unit) => ({
                   runScoringUnitId: unit.runScoringUnitId,
                   unitIndex: unit.unitIndex,
                   timeSeconds: unit.timeSeconds,

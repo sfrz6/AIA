@@ -4,7 +4,7 @@ import {
   championshipEvents,
   championshipRuns,
   championshipTemplates,
-  countries,
+  clubs,
   riders,
   templateDays,
   templateEvents,
@@ -104,9 +104,9 @@ export async function createTemplate(
   return template.id;
 }
 
-/** Registers five riders under a country and returns their identifiers. */
+/** Registers five riders under a club and returns their identifiers. */
 export async function createSquadRiders(
-  countryId: string,
+  clubId: string,
   prefix: string,
 ): Promise<readonly string[]> {
   const db = getDb();
@@ -114,7 +114,7 @@ export async function createSquadRiders(
     .insert(riders)
     .values(
       Array.from({ length: 5 }, (_, index) => ({
-        countryId,
+        clubId,
         fullName: `${prefix} Rider ${index + 1}`,
       })),
     )
@@ -122,41 +122,54 @@ export async function createSquadRiders(
   return created.map((rider) => rider.id);
 }
 
-export async function countryIdByIso(iso2: string): Promise<string> {
+/**
+ * Gets or creates a test club by name.
+ *
+ * Clubs are no longer pre-seeded from a fixed registry, so tests create
+ * their own on demand; idempotent, so repeated calls with the same name in
+ * one test run reuse the same club.
+ */
+export async function clubIdByName(name: string): Promise<string> {
   const db = getDb();
-  const [row] = await db
-    .select({ id: countries.id })
-    .from(countries)
-    .where(eq(countries.iso2, iso2))
-    .limit(1);
-  if (!row) throw new Error(`Country ${iso2} is not seeded.`);
+  const [existing] = await db.select({ id: clubs.id }).from(clubs).where(eq(clubs.name, name)).limit(1);
+  if (existing) return existing.id;
+
+  const [created] = await db
+    .insert(clubs)
+    .values({ name })
+    .onConflictDoNothing()
+    .returning({ id: clubs.id });
+  if (created) return created.id;
+
+  const [row] = await db.select({ id: clubs.id }).from(clubs).where(eq(clubs.name, name)).limit(1);
+  if (!row) throw new Error(`Club ${name} could not be created.`);
   return row.id;
 }
 
 export interface ChampionshipFixture {
   readonly championshipId: string;
-  readonly countryIds: readonly string[];
+  readonly clubIds: readonly string[];
 }
 
 /**
- * Creates a championship from a template with the given countries, each with
+ * Creates a championship from a template with the given clubs, each with
  * four active riders and one reserve.
  */
 export async function createChampionshipFixture(options: {
   actor: Principal;
   templateId: string;
   name?: string;
-  isoCodes?: readonly string[];
+  clubNames?: readonly string[];
 }): Promise<ChampionshipFixture> {
   const db = getDb();
-  const isoCodes = options.isoCodes ?? ["JO", "OM"];
+  const clubNames = options.clubNames ?? ["JO", "OM"];
 
   const squads: SquadInput[] = [];
-  for (const iso of isoCodes) {
-    const countryId = await countryIdByIso(iso);
-    const riderIds = await createSquadRiders(countryId, iso);
+  for (const clubName of clubNames) {
+    const clubId = await clubIdByName(clubName);
+    const riderIds = await createSquadRiders(clubId, clubName);
     squads.push({
-      countryId,
+      clubId,
       riders: riderIds.map((riderId, index) => ({
         riderId,
         rosterSlot: index < 4 ? ("ACTIVE" as const) : ("RESERVE" as const),
@@ -179,7 +192,7 @@ export async function createChampionshipFixture(options: {
 
   return {
     championshipId: created.id,
-    countryIds: squads.map((squad) => squad.countryId),
+    clubIds: squads.map((squad) => squad.clubId),
   };
 }
 

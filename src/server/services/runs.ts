@@ -1,13 +1,13 @@
 import { and, asc, eq, gt, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import { getDb, type Executor } from "@/db";
 import {
-  championshipCountries,
+  championshipClubs,
   championshipDays,
   championshipEvents,
   championshipRiders,
   championshipRuns,
   championships,
-  countries,
+  clubs,
   riders,
   runEntryOrderItems,
   runEntryOrders,
@@ -25,7 +25,7 @@ import {
 import {
   allowedTargetPoints,
   getEventTypeDefinition,
-  RIDERS_PER_COUNTRY_PER_RUN,
+  RIDERS_PER_CLUB_PER_RUN,
   type EventTypeDefinition,
   type EventTypeKey,
 } from "@/domain/scoring/event-types";
@@ -50,7 +50,7 @@ const RUN_NOT_STARTED: readonly RunStatus[] = ["ENTRY_ORDER_PENDING", "READY"];
 /**
  * Whether a run's entry order may still be recorded or changed.
  *
- * Not just before the run starts: a country can be late submitting its final
+ * Not just before the run starts: a club can be late submitting its final
  * lineup, so the order stays editable through scoring too, right up until the
  * first score is actually saved. Once any time or target has been written,
  * re-materialising the scoring units would discard real data, so the order
@@ -88,16 +88,14 @@ export interface RunRosterRider {
   readonly initialOrder: number | null;
 }
 
-export interface RunCountryEntryOrder {
-  readonly championshipCountryId: string;
-  readonly countryId: string;
-  readonly iso2: string;
-  readonly iso3: string;
-  readonly countryName: string;
+export interface RunClubEntryOrder {
+  readonly championshipClubId: string;
+  readonly clubId: string;
+  readonly clubName: string;
   readonly roster: readonly RunRosterRider[];
   /** Order confirmed for the most recent earlier run, if any. */
   readonly previousOrder: readonly string[];
-  /** Order confirmed for this run, empty when the country is not reviewed yet. */
+  /** Order confirmed for this run, empty when the club is not reviewed yet. */
   readonly confirmedOrder: readonly string[];
   readonly decision: "NO_CHANGE" | "CHANGED" | null;
   readonly confirmedByName: string | null;
@@ -106,7 +104,7 @@ export interface RunCountryEntryOrder {
 
 export interface RunEntryOrderState {
   readonly run: RunContext;
-  readonly countries: readonly RunCountryEntryOrder[];
+  readonly clubs: readonly RunClubEntryOrder[];
   readonly confirmedCount: number;
   readonly totalCount: number;
   readonly allConfirmed: boolean;
@@ -118,7 +116,7 @@ async function loadRoster(
 ): Promise<Map<string, RunRosterRider[]>> {
   const rows = await tx
     .select({
-      championshipCountryId: championshipRiders.championshipCountryId,
+      championshipClubId: championshipRiders.championshipClubId,
       championshipRiderId: championshipRiders.id,
       riderId: riders.id,
       fullName: riders.fullName,
@@ -127,28 +125,28 @@ async function loadRoster(
     })
     .from(championshipRiders)
     .innerJoin(
-      championshipCountries,
-      eq(championshipCountries.id, championshipRiders.championshipCountryId),
+      championshipClubs,
+      eq(championshipClubs.id, championshipRiders.championshipClubId),
     )
     .innerJoin(riders, eq(riders.id, championshipRiders.riderId))
-    .where(eq(championshipCountries.championshipId, championshipId))
+    .where(eq(championshipClubs.championshipId, championshipId))
     .orderBy(asc(championshipRiders.rosterSlot), asc(championshipRiders.initialOrder));
 
   const grouped = new Map<string, RunRosterRider[]>();
   for (const row of rows) {
-    const bucket = grouped.get(row.championshipCountryId);
+    const bucket = grouped.get(row.championshipClubId);
     if (bucket) bucket.push(row);
-    else grouped.set(row.championshipCountryId, [row]);
+    else grouped.set(row.championshipClubId, [row]);
   }
   return grouped;
 }
 
 /**
- * The entry order confirmed for each country in the most recent run that comes
+ * The entry order confirmed for each club in the most recent run that comes
  * before `run` in competition order.
  *
  * Earlier runs are never rewritten, so this is a read of history: it answers
- * "what order did this country last ride in", which is what "no change" means.
+ * "what order did this club last ride in", which is what "no change" means.
  */
 async function loadPreviousOrders(
   tx: Executor,
@@ -156,7 +154,7 @@ async function loadPreviousOrders(
 ): Promise<Map<string, string[]>> {
   const rows = await tx
     .select({
-      championshipCountryId: runEntryOrders.championshipCountryId,
+      championshipClubId: runEntryOrders.championshipClubId,
       dayNumber: championshipDays.dayNumber,
       orderIndex: championshipEvents.orderIndex,
       runNumber: championshipRuns.runNumber,
@@ -202,21 +200,21 @@ async function loadPreviousOrders(
       asc(runEntryOrderItems.position),
     );
 
-  // Rows arrive oldest first, so each country's later run overwrites the
+  // Rows arrive oldest first, so each club's later run overwrites the
   // earlier one and the last write wins, which is the most recent order.
   const latest = new Map<string, { key: string; order: string[] }>();
   for (const row of rows) {
     const key = `${row.dayNumber}.${row.orderIndex}.${row.runNumber}`;
-    const current = latest.get(row.championshipCountryId);
+    const current = latest.get(row.championshipClubId);
     if (!current || current.key !== key) {
-      latest.set(row.championshipCountryId, { key, order: [row.championshipRiderId] });
+      latest.set(row.championshipClubId, { key, order: [row.championshipRiderId] });
     } else {
       current.order.push(row.championshipRiderId);
     }
   }
 
   const result = new Map<string, string[]>();
-  for (const [countryId, value] of latest) result.set(countryId, value.order);
+  for (const [clubId, value] of latest) result.set(clubId, value.order);
   return result;
 }
 
@@ -228,27 +226,26 @@ export async function getRunEntryOrderState(
   const run = await getRunContext(runId);
   if (!run) return null;
 
-  const countryName = locale === "ar" ? countries.nameAr : countries.nameEn;
+  const clubName =
+    locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
 
   const participating = await db
     .select({
-      championshipCountryId: championshipCountries.id,
-      countryId: countries.id,
-      iso2: countries.iso2,
-      iso3: countries.iso3,
-      countryName,
+      championshipClubId: championshipClubs.id,
+      clubId: clubs.id,
+      clubName,
     })
-    .from(championshipCountries)
-    .innerJoin(countries, eq(countries.id, championshipCountries.countryId))
-    .where(eq(championshipCountries.championshipId, run.championshipId))
-    .orderBy(asc(championshipCountries.orderIndex));
+    .from(championshipClubs)
+    .innerJoin(clubs, eq(clubs.id, championshipClubs.clubId))
+    .where(eq(championshipClubs.championshipId, run.championshipId))
+    .orderBy(asc(championshipClubs.orderIndex));
 
-  const [rosterByCountry, previousOrders, confirmed] = await Promise.all([
+  const [rosterByClub, previousOrders, confirmed] = await Promise.all([
     loadRoster(db, run.championshipId),
     loadPreviousOrders(db, run),
     db
       .select({
-        championshipCountryId: runEntryOrders.championshipCountryId,
+        championshipClubId: runEntryOrders.championshipClubId,
         decision: runEntryOrders.decision,
         confirmedAt: runEntryOrders.confirmedAt,
         position: runEntryOrderItems.position,
@@ -260,25 +257,25 @@ export async function getRunEntryOrderState(
       .orderBy(asc(runEntryOrderItems.position)),
   ]);
 
-  const confirmedByCountry = new Map<
+  const confirmedByClub = new Map<
     string,
     { decision: "NO_CHANGE" | "CHANGED"; confirmedAt: Date; order: string[] }
   >();
   for (const row of confirmed) {
-    let entry = confirmedByCountry.get(row.championshipCountryId);
+    let entry = confirmedByClub.get(row.championshipClubId);
     if (!entry) {
       entry = { decision: row.decision, confirmedAt: row.confirmedAt, order: [] };
-      confirmedByCountry.set(row.championshipCountryId, entry);
+      confirmedByClub.set(row.championshipClubId, entry);
     }
     if (row.championshipRiderId) entry.order.push(row.championshipRiderId);
   }
 
-  const countriesState = participating.map<RunCountryEntryOrder>((country) => {
-    const entry = confirmedByCountry.get(country.championshipCountryId);
+  const clubsState = participating.map<RunClubEntryOrder>((club) => {
+    const entry = confirmedByClub.get(club.championshipClubId);
     return {
-      ...country,
-      roster: rosterByCountry.get(country.championshipCountryId) ?? [],
-      previousOrder: previousOrders.get(country.championshipCountryId) ?? [],
+      ...club,
+      roster: rosterByClub.get(club.championshipClubId) ?? [],
+      previousOrder: previousOrders.get(club.championshipClubId) ?? [],
       confirmedOrder: entry?.order ?? [],
       decision: entry?.decision ?? null,
       confirmedByName: null,
@@ -286,14 +283,14 @@ export async function getRunEntryOrderState(
     };
   });
 
-  const confirmedCount = countriesState.filter((country) => country.decision !== null).length;
+  const confirmedCount = clubsState.filter((club) => club.decision !== null).length;
 
   return {
     run,
-    countries: countriesState,
+    clubs: clubsState,
     confirmedCount,
-    totalCount: countriesState.length,
-    allConfirmed: countriesState.length > 0 && confirmedCount === countriesState.length,
+    totalCount: clubsState.length,
+    allConfirmed: clubsState.length > 0 && confirmedCount === clubsState.length,
   };
 }
 
@@ -314,7 +311,7 @@ export interface EventPrintState {
   readonly championshipLocation: string;
   readonly championshipOrganizer: string | null;
   readonly runs: readonly EventPrintRun[];
-  readonly countries: readonly RunCountryEntryOrder[];
+  readonly clubs: readonly RunClubEntryOrder[];
 }
 
 /**
@@ -326,7 +323,7 @@ export interface EventPrintState {
  * in the same event no longer carry their own independent order (it is
  * locked once per event, inherited automatically — see
  * `propagateEntryOrderWithinEvent`), so there is exactly one roster to print
- * per country, with a scoring block per run alongside it.
+ * per club, with a scoring block per run alongside it.
  */
 export async function getEventPrintState(
   eventId: string,
@@ -377,7 +374,7 @@ export async function getEventPrintState(
     championshipLocation: eventRow.championshipLocation,
     championshipOrganizer: eventRow.championshipOrganizer,
     runs,
-    countries: firstRunState.countries,
+    clubs: firstRunState.clubs,
   };
 }
 
@@ -399,7 +396,7 @@ export interface EventPrintRunValues {
   readonly runNumber: number;
   /** Keyed by championship rider id. */
   readonly ridersById: ReadonlyMap<string, EventPrintRiderValue>;
-  /** Keyed by `${championshipCountryId}:${unitIndex}`, matching `scoreRun`'s own unit results. */
+  /** Keyed by `${championshipClubId}:${unitIndex}`, matching `scoreRun`'s own unit results. */
   readonly unitsByKey: ReadonlyMap<string, EventPrintUnitValue>;
 }
 
@@ -427,11 +424,11 @@ export async function getEventResultsForPrint(
   const runResults = await Promise.all(
     state.runs.map(async (run): Promise<EventPrintRunValues> => {
       const scoringState = await getRunScoringState(run.runId, locale);
-      const countries = scoringState?.countries ?? [];
+      const clubs = scoringState?.clubs ?? [];
 
       const targetsByRiderId = new Map<string, readonly (string | null)[]>();
-      for (const country of countries) {
-        for (const unit of country.units) {
+      for (const club of clubs) {
+        for (const unit of club.units) {
           for (const rider of unit.riders) {
             targetsByRiderId.set(rider.championshipRiderId, rider.targets);
           }
@@ -441,10 +438,10 @@ export async function getEventResultsForPrint(
       const input: RunScoringInput = {
         eventTypeKey: state.eventType,
         timeLimitSeconds: run.timeLimitSeconds,
-        units: countries.flatMap((country) =>
-          country.units.map((unit) => ({
+        units: clubs.flatMap((club) =>
+          club.units.map((unit) => ({
             unitIndex: unit.unitIndex,
-            championshipCountryId: country.championshipCountryId,
+            championshipClubId: club.championshipClubId,
             timeSeconds: unit.timeSeconds,
             riders: unit.riders.map((rider) => ({
               championshipRiderId: rider.championshipRiderId,
@@ -472,7 +469,7 @@ export async function getEventResultsForPrint(
         ),
         unitsByKey: new Map(
           result.units.map((unit) => [
-            `${unit.championshipCountryId}:${unit.unitIndex}`,
+            `${unit.championshipClubId}:${unit.unitIndex}`,
             {
               timeSeconds: unit.timeSeconds === null ? null : unit.timeSeconds.toFixed(2),
               penalty: formatPoints(unit.penalty),
@@ -488,19 +485,19 @@ export async function getEventResultsForPrint(
 }
 
 /**
- * Records a country's entry order decision for one run and lays out the run's
- * scoring units for that country.
+ * Records a club's entry order decision for one run and lays out the run's
+ * scoring units for that club.
  *
  * The stored order is a historical snapshot. Re-confirming before the run
- * starts replaces it along with the country's empty score rows; once scoring
+ * starts replaces it along with the club's empty score rows; once scoring
  * has begun, the order is locked.
  */
-export async function confirmCountryEntryOrder(
+export async function confirmClubEntryOrder(
   tx: Executor,
   actor: Principal,
   input: {
     runId: string;
-    championshipCountryId: string;
+    championshipClubId: string;
     decision: "NO_CHANGE" | "CHANGED";
     order?: readonly string[];
   },
@@ -521,17 +518,17 @@ export async function confirmCountryEntryOrder(
     );
   }
 
-  const [country] = await tx
-    .select({ id: championshipCountries.id, championshipId: championshipCountries.championshipId })
-    .from(championshipCountries)
-    .where(eq(championshipCountries.id, input.championshipCountryId))
+  const [club] = await tx
+    .select({ id: championshipClubs.id, championshipId: championshipClubs.championshipId })
+    .from(championshipClubs)
+    .where(eq(championshipClubs.id, input.championshipClubId))
     .limit(1);
-  if (!country || country.championshipId !== run.championshipId) {
-    throw new DomainError("This country does not take part in this championship.", "NOT_FOUND");
+  if (!club || club.championshipId !== run.championshipId) {
+    throw new DomainError("This club does not take part in this championship.", "NOT_FOUND");
   }
 
-  const rosterByCountry = await loadRoster(tx, run.championshipId);
-  const roster = rosterByCountry.get(input.championshipCountryId) ?? [];
+  const rosterByClub = await loadRoster(tx, run.championshipId);
+  const roster = rosterByClub.get(input.championshipClubId) ?? [];
   const rosterMembers: RosterMember[] = roster.map((member) => ({
     championshipRiderId: member.championshipRiderId,
     rosterSlot: member.rosterSlot,
@@ -539,14 +536,14 @@ export async function confirmCountryEntryOrder(
   }));
 
   const previousOrders = await loadPreviousOrders(tx, run);
-  const previousOrder = previousOrders.get(input.championshipCountryId) ?? null;
+  const previousOrder = previousOrders.get(input.championshipClubId) ?? null;
 
   const order =
     input.decision === "NO_CHANGE"
       ? inheritedEntryOrder(previousOrder, rosterMembers)
       : (input.order ?? []);
 
-  const invalid = validateEntryOrder(rosterMembers, order, RIDERS_PER_COUNTRY_PER_RUN);
+  const invalid = validateEntryOrder(rosterMembers, order, RIDERS_PER_CLUB_PER_RUN);
   if (invalid) throw new DomainError(invalid.message, "VALIDATION");
 
   const existing = await tx
@@ -555,7 +552,7 @@ export async function confirmCountryEntryOrder(
     .where(
       and(
         eq(runEntryOrders.runId, input.runId),
-        eq(runEntryOrders.championshipCountryId, input.championshipCountryId),
+        eq(runEntryOrders.championshipClubId, input.championshipClubId),
       ),
     )
     .limit(1);
@@ -568,7 +565,7 @@ export async function confirmCountryEntryOrder(
     .insert(runEntryOrders)
     .values({
       runId: input.runId,
-      championshipCountryId: input.championshipCountryId,
+      championshipClubId: input.championshipClubId,
       decision: input.decision,
       confirmedByUserId: actor.userId,
     })
@@ -583,7 +580,7 @@ export async function confirmCountryEntryOrder(
     })),
   );
 
-  await materialiseCountryScoringUnits(tx, run, input.championshipCountryId, order);
+  await materialiseClubScoringUnits(tx, run, input.championshipClubId, order);
 
   await recordAudit(tx, actor, {
     action: "ENTRY_ORDER_CONFIRMED",
@@ -599,9 +596,9 @@ export async function confirmCountryEntryOrder(
 }
 
 /**
- * Once every country has confirmed the entry order for an event's first run,
+ * Once every club has confirmed the entry order for an event's first run,
  * the same order is copied into that event's later runs (Run 2, Run 3): a
- * country's lineup can only change once per event, not before every run
+ * club's lineup can only change once per event, not before every run
  * inside it. A later run that has already started is left alone — its own
  * order was locked in when its scoring began, same as any other run.
  *
@@ -616,7 +613,7 @@ async function propagateEntryOrderWithinEvent(
 ): Promise<void> {
   if (firstRun.runNumber !== 1) return;
 
-  const complete = await allCountriesHaveConfirmed(tx, firstRun.championshipId, firstRun.runId);
+  const complete = await allClubsHaveConfirmed(tx, firstRun.championshipId, firstRun.runId);
   if (!complete) return;
 
   const laterRuns = await tx
@@ -635,18 +632,18 @@ async function propagateEntryOrderWithinEvent(
 
   if (laterRuns.length === 0) return;
 
-  const participatingCountries = await tx
-    .select({ id: championshipCountries.id })
-    .from(championshipCountries)
-    .where(eq(championshipCountries.championshipId, firstRun.championshipId));
+  const participatingClubs = await tx
+    .select({ id: championshipClubs.id })
+    .from(championshipClubs)
+    .where(eq(championshipClubs.championshipId, firstRun.championshipId));
 
   for (const laterRun of laterRuns) {
     if (!(await canEditEntryOrder(tx, { status: laterRun.status, runId: laterRun.id }))) continue;
-    for (const country of participatingCountries) {
-      await confirmCountryEntryOrder(
+    for (const club of participatingClubs) {
+      await confirmClubEntryOrder(
         tx,
         actor,
-        { runId: laterRun.id, championshipCountryId: country.id, decision: "NO_CHANGE" },
+        { runId: laterRun.id, championshipClubId: club.id, decision: "NO_CHANGE" },
         { internal: true },
       );
     }
@@ -675,14 +672,14 @@ export async function listEventRunIds(runId: string): Promise<readonly string[]>
 }
 
 /**
- * Creates the empty score rows for one country in one run, from its confirmed
- * entry order. Any previous rows for that country in that run are removed, so
+ * Creates the empty score rows for one club in one run, from its confirmed
+ * entry order. Any previous rows for that club in that run are removed, so
  * re-confirming the order before the run starts leaves no stale scores behind.
  */
-async function materialiseCountryScoringUnits(
+async function materialiseClubScoringUnits(
   tx: Executor,
   run: RunContext,
-  championshipCountryId: string,
+  championshipClubId: string,
   order: readonly string[],
 ): Promise<void> {
   const definition = getEventTypeDefinition(run.eventType);
@@ -692,7 +689,7 @@ async function materialiseCountryScoringUnits(
     .where(
       and(
         eq(runScoringUnits.runId, run.runId),
-        eq(runScoringUnits.championshipCountryId, championshipCountryId),
+        eq(runScoringUnits.championshipClubId, championshipClubId),
       ),
     );
 
@@ -703,7 +700,7 @@ async function materialiseCountryScoringUnits(
       .insert(runScoringUnits)
       .values({
         runId: run.runId,
-        championshipCountryId,
+        championshipClubId,
         unitIndex: unit.unitIndex,
         timeSeconds: null,
       })
@@ -734,14 +731,14 @@ async function materialiseCountryScoringUnits(
 }
 
 /**
- * Whether every participating country has recorded an entry order decision.
+ * Whether every participating club has recorded an entry order decision.
  *
  * Counted fresh inside the caller's transaction, because this is the condition
  * that actually gates starting a run. The stored status is only a label for the
- * interface: two countries confirming at the same moment each commit without
+ * interface: two clubs confirming at the same moment each commit without
  * seeing the other, so neither would observe the run becoming complete.
  */
-async function allCountriesHaveConfirmed(
+async function allClubsHaveConfirmed(
   tx: Executor,
   championshipId: string,
   runId: string,
@@ -752,7 +749,7 @@ async function allCountriesHaveConfirmed(
   const [counts] = await tx
     .select({
       total: sql<number>`(
-        select count(*)::int from championship_countries cc
+        select count(*)::int from championship_clubs cc
         where cc.championship_id = ${championshipId}
       )`,
       confirmed: sql<number>`(
@@ -768,11 +765,11 @@ async function allCountriesHaveConfirmed(
   return total > 0 && confirmed >= total;
 }
 
-/** Moves a run between pending and ready as countries are reviewed. */
+/** Moves a run between pending and ready as clubs are reviewed. */
 async function refreshRunReadiness(tx: Executor, run: RunContext): Promise<void> {
   if (!RUN_NOT_STARTED.includes(run.status)) return;
 
-  const complete = await allCountriesHaveConfirmed(tx, run.championshipId, run.runId);
+  const complete = await allClubsHaveConfirmed(tx, run.championshipId, run.runId);
   const nextStatus: RunStatus = complete ? "READY" : "ENTRY_ORDER_PENDING";
 
   if (nextStatus !== run.status) {
@@ -797,24 +794,22 @@ export interface RunScoringRider {
 
 export interface RunScoringUnit {
   readonly runScoringUnitId: string;
-  readonly championshipCountryId: string;
+  readonly championshipClubId: string;
   readonly unitIndex: number;
   readonly timeSeconds: string | null;
   readonly riders: readonly RunScoringRider[];
 }
 
-export interface RunScoringCountry {
-  readonly championshipCountryId: string;
-  readonly iso2: string;
-  readonly iso3: string;
-  readonly countryName: string;
+export interface RunScoringClub {
+  readonly championshipClubId: string;
+  readonly clubName: string;
   readonly units: readonly RunScoringUnit[];
 }
 
 export interface RunScoringState {
   readonly run: RunContext;
   readonly eventType: EventTypeKey;
-  readonly countries: readonly RunScoringCountry[];
+  readonly clubs: readonly RunScoringClub[];
 }
 
 export async function getRunScoringState(
@@ -825,17 +820,16 @@ export async function getRunScoringState(
   const run = await getRunContext(runId);
   if (!run) return null;
 
-  const countryName = locale === "ar" ? countries.nameAr : countries.nameEn;
+  const clubName =
+    locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
 
   const rows = await db
     .select({
       runScoringUnitId: runScoringUnits.id,
       unitIndex: runScoringUnits.unitIndex,
       timeSeconds: runScoringUnits.timeSeconds,
-      championshipCountryId: championshipCountries.id,
-      iso2: countries.iso2,
-      iso3: countries.iso3,
-      countryName,
+      championshipClubId: championshipClubs.id,
+      clubName,
       runScoreId: runScores.id,
       championshipRiderId: runScores.championshipRiderId,
       positionInUnit: runScores.positionInUnit,
@@ -845,57 +839,55 @@ export async function getRunScoringState(
     })
     .from(runScoringUnits)
     .innerJoin(
-      championshipCountries,
-      eq(championshipCountries.id, runScoringUnits.championshipCountryId),
+      championshipClubs,
+      eq(championshipClubs.id, runScoringUnits.championshipClubId),
     )
-    .innerJoin(countries, eq(countries.id, championshipCountries.countryId))
+    .innerJoin(clubs, eq(clubs.id, championshipClubs.clubId))
     .innerJoin(runScores, eq(runScores.runScoringUnitId, runScoringUnits.id))
     .innerJoin(championshipRiders, eq(championshipRiders.id, runScores.championshipRiderId))
     .innerJoin(riders, eq(riders.id, championshipRiders.riderId))
     .innerJoin(runScoreTargets, eq(runScoreTargets.runScoreId, runScores.id))
     .where(eq(runScoringUnits.runId, runId))
     .orderBy(
-      asc(championshipCountries.orderIndex),
+      asc(championshipClubs.orderIndex),
       asc(runScoringUnits.unitIndex),
       asc(runScores.positionInUnit),
       asc(runScoreTargets.targetIndex),
     );
 
-  const countryMap = new Map<
+  const clubMap = new Map<
     string,
     {
-      record: Omit<RunScoringCountry, "units">;
+      record: Omit<RunScoringClub, "units">;
       units: Map<string, { unit: Omit<RunScoringUnit, "riders">; riders: Map<string, { rider: Omit<RunScoringRider, "targets">; targets: (string | null)[] }> }>;
     }
   >();
 
   for (const row of rows) {
-    let country = countryMap.get(row.championshipCountryId);
-    if (!country) {
-      country = {
+    let club = clubMap.get(row.championshipClubId);
+    if (!club) {
+      club = {
         record: {
-          championshipCountryId: row.championshipCountryId,
-          iso2: row.iso2,
-          iso3: row.iso3,
-          countryName: row.countryName,
+          championshipClubId: row.championshipClubId,
+          clubName: row.clubName,
         },
         units: new Map(),
       };
-      countryMap.set(row.championshipCountryId, country);
+      clubMap.set(row.championshipClubId, club);
     }
 
-    let unit = country.units.get(row.runScoringUnitId);
+    let unit = club.units.get(row.runScoringUnitId);
     if (!unit) {
       unit = {
         unit: {
           runScoringUnitId: row.runScoringUnitId,
-          championshipCountryId: row.championshipCountryId,
+          championshipClubId: row.championshipClubId,
           unitIndex: row.unitIndex,
           timeSeconds: row.timeSeconds,
         },
         riders: new Map(),
       };
-      country.units.set(row.runScoringUnitId, unit);
+      club.units.set(row.runScoringUnitId, unit);
     }
 
     let rider = unit.riders.get(row.runScoreId);
@@ -918,9 +910,9 @@ export async function getRunScoringState(
   return {
     run,
     eventType: run.eventType,
-    countries: [...countryMap.values()].map((country) => ({
-      ...country.record,
-      units: [...country.units.values()].map((unit) => ({
+    clubs: [...clubMap.values()].map((club) => ({
+      ...club.record,
+      units: [...club.units.values()].map((unit) => ({
         ...unit.unit,
         riders: [...unit.riders.values()].map((rider) => ({
           ...rider.rider,
@@ -1108,10 +1100,10 @@ export async function startRun(
     throw new DomainError("This run has already started.", "CONFLICT");
   }
   // Gated on a fresh count rather than on the stored status, so a run whose
-  // last two countries were confirmed concurrently can still be started.
-  if (!(await allCountriesHaveConfirmed(tx, run.championshipId, runId))) {
+  // last two clubs were confirmed concurrently can still be started.
+  if (!(await allClubsHaveConfirmed(tx, run.championshipId, runId))) {
     throw new DomainError(
-      "Every country must confirm its entry order before the run can start.",
+      "Every club must confirm its entry order before the run can start.",
       "CONFLICT",
     );
   }
@@ -1197,7 +1189,7 @@ export async function confirmRun(
 export interface RunSnapshot {
   readonly units: ReadonlyArray<{
     unitIndex: number;
-    championshipCountryId: string;
+    championshipClubId: string;
     timeSeconds: string | null;
     riders: ReadonlyArray<{
       championshipRiderId: string;
@@ -1212,7 +1204,7 @@ export async function snapshotRun(tx: Executor, runId: string): Promise<RunSnaps
     .select({
       unitId: runScoringUnits.id,
       unitIndex: runScoringUnits.unitIndex,
-      championshipCountryId: runScoringUnits.championshipCountryId,
+      championshipClubId: runScoringUnits.championshipClubId,
       timeSeconds: runScoringUnits.timeSeconds,
       scoreId: runScores.id,
       championshipRiderId: runScores.championshipRiderId,
@@ -1234,7 +1226,7 @@ export async function snapshotRun(tx: Executor, runId: string): Promise<RunSnaps
     string,
     {
       unitIndex: number;
-      championshipCountryId: string;
+      championshipClubId: string;
       timeSeconds: string | null;
       riders: Map<
         string,
@@ -1248,7 +1240,7 @@ export async function snapshotRun(tx: Executor, runId: string): Promise<RunSnaps
     if (!unit) {
       unit = {
         unitIndex: row.unitIndex,
-        championshipCountryId: row.championshipCountryId,
+        championshipClubId: row.championshipClubId,
         timeSeconds: row.timeSeconds,
         riders: new Map(),
       };
@@ -1269,7 +1261,7 @@ export async function snapshotRun(tx: Executor, runId: string): Promise<RunSnaps
   return {
     units: [...units.values()].map((unit) => ({
       unitIndex: unit.unitIndex,
-      championshipCountryId: unit.championshipCountryId,
+      championshipClubId: unit.championshipClubId,
       timeSeconds: unit.timeSeconds,
       riders: [...unit.riders.values()],
     })),
@@ -1386,7 +1378,7 @@ export async function loadRunScoringUnits(
   const snapshot = await snapshotRun(tx, runId);
   return snapshot.units.map((unit) => ({
     unitIndex: unit.unitIndex,
-    championshipCountryId: unit.championshipCountryId,
+    championshipClubId: unit.championshipClubId,
     timeSeconds: unit.timeSeconds,
     riders: unit.riders.map((rider) => ({
       championshipRiderId: rider.championshipRiderId,

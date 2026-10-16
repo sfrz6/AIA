@@ -1,12 +1,12 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
-  championshipCountries,
+  championshipClubs,
   championshipDays,
   championshipEvents,
   championshipRiders,
   championshipRuns,
-  countries,
+  clubs,
   riders,
   runScoreTargets,
   runScores,
@@ -49,7 +49,7 @@ export async function loadConfirmedRuns(
       dayNumber: championshipDays.dayNumber,
       unitId: runScoringUnits.id,
       unitIndex: runScoringUnits.unitIndex,
-      championshipCountryId: runScoringUnits.championshipCountryId,
+      championshipClubId: runScoringUnits.championshipClubId,
       timeSeconds: runScoringUnits.timeSeconds,
       scoreId: runScores.id,
       championshipRiderId: runScores.championshipRiderId,
@@ -89,7 +89,7 @@ export async function loadConfirmedRuns(
         string,
         {
           unitIndex: number;
-          championshipCountryId: string;
+          championshipClubId: string;
           timeSeconds: string | null;
           riders: Map<
             string,
@@ -121,7 +121,7 @@ export async function loadConfirmedRuns(
     if (!unit) {
       unit = {
         unitIndex: row.unitIndex,
-        championshipCountryId: row.championshipCountryId,
+        championshipClubId: row.championshipClubId,
         timeSeconds: row.timeSeconds,
         riders: new Map(),
       };
@@ -145,7 +145,7 @@ export async function loadConfirmedRuns(
     ...run.meta,
     units: [...run.units.values()].map((unit) => ({
       unitIndex: unit.unitIndex,
-      championshipCountryId: unit.championshipCountryId,
+      championshipClubId: unit.championshipClubId,
       timeSeconds: unit.timeSeconds,
       riders: [...unit.riders.values()].map((rider) => ({
         championshipRiderId: rider.championshipRiderId,
@@ -168,7 +168,7 @@ export interface StoredTieBreakRound extends TieBreakRoundInput {
 /**
  * Loads the tie-break rounds recorded for a championship.
  *
- * For a country round the entry's points are the sum of the riders that took
+ * For a club round the entry's points are the sum of the riders that took
  * part in the draw, which is how the reference workbook totals the team round.
  */
 export async function loadTieBreakRounds(
@@ -186,7 +186,7 @@ export async function loadTieBreakRounds(
       maxPoints: tieBreakRounds.maxPoints,
       entryId: tieBreakEntries.id,
       championshipRiderId: tieBreakEntries.championshipRiderId,
-      championshipCountryId: tieBreakEntries.championshipCountryId,
+      championshipClubId: tieBreakEntries.championshipClubId,
       timeSeconds: tieBreakEntries.timeSeconds,
       scorePoints: tieBreakEntryScores.points,
     })
@@ -222,7 +222,7 @@ export async function loadTieBreakRounds(
     }
     if (!row.entryId) continue;
 
-    const subjectKey = row.championshipRiderId ?? row.championshipCountryId;
+    const subjectKey = row.championshipRiderId ?? row.championshipClubId;
     if (!subjectKey || row.timeSeconds === null) continue;
 
     const existing = round.entries.get(row.entryId);
@@ -245,14 +245,12 @@ export async function loadTieBreakRounds(
   return result;
 }
 
-export interface DirectoryCountry {
-  readonly championshipCountryId: string;
-  readonly iso2: string;
-  readonly iso3: string;
-  readonly countryName: string;
+export interface DirectoryClub {
+  readonly championshipClubId: string;
+  readonly clubName: string;
 }
 
-export interface DirectoryRider extends DirectoryCountry {
+export interface DirectoryRider extends DirectoryClub {
   readonly championshipRiderId: string;
   readonly riderName: string;
   readonly rosterSlot: "ACTIVE" | "RESERVE";
@@ -260,7 +258,7 @@ export interface DirectoryRider extends DirectoryCountry {
 
 export interface ChampionshipParticipantDirectory {
   readonly riders: ReadonlyMap<string, DirectoryRider>;
-  readonly countries: ReadonlyMap<string, DirectoryCountry>;
+  readonly clubs: ReadonlyMap<string, DirectoryClub>;
 }
 
 export async function loadParticipantDirectory(
@@ -268,55 +266,50 @@ export async function loadParticipantDirectory(
   locale: Locale,
 ): Promise<ChampionshipParticipantDirectory> {
   const db = getDb();
-  const countryName = locale === "ar" ? countries.nameAr : countries.nameEn;
+  const clubName =
+    locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
 
   const rows = await db
     .select({
       championshipRiderId: championshipRiders.id,
       riderName: riders.fullName,
       rosterSlot: championshipRiders.rosterSlot,
-      championshipCountryId: championshipCountries.id,
-      iso2: countries.iso2,
-      iso3: countries.iso3,
-      countryName,
+      championshipClubId: championshipClubs.id,
+      clubName,
     })
-    .from(championshipCountries)
-    .innerJoin(countries, eq(countries.id, championshipCountries.countryId))
+    .from(championshipClubs)
+    .innerJoin(clubs, eq(clubs.id, championshipClubs.clubId))
     .leftJoin(
       championshipRiders,
-      eq(championshipRiders.championshipCountryId, championshipCountries.id),
+      eq(championshipRiders.championshipClubId, championshipClubs.id),
     )
     .leftJoin(riders, eq(riders.id, championshipRiders.riderId))
-    .where(eq(championshipCountries.championshipId, championshipId))
+    .where(eq(championshipClubs.championshipId, championshipId))
     .orderBy(
-      asc(championshipCountries.orderIndex),
+      asc(championshipClubs.orderIndex),
       asc(championshipRiders.rosterSlot),
       asc(riders.fullName),
     );
 
   const riderMap = new Map<string, DirectoryRider>();
-  const countryMap = new Map<string, DirectoryCountry>();
+  const clubMap = new Map<string, DirectoryClub>();
 
   for (const row of rows) {
-    countryMap.set(row.championshipCountryId, {
-      championshipCountryId: row.championshipCountryId,
-      iso2: row.iso2,
-      iso3: row.iso3,
-      countryName: row.countryName,
+    clubMap.set(row.championshipClubId, {
+      championshipClubId: row.championshipClubId,
+      clubName: row.clubName,
     });
     if (!row.championshipRiderId || !row.riderName || !row.rosterSlot) continue;
     riderMap.set(row.championshipRiderId, {
       championshipRiderId: row.championshipRiderId,
       riderName: row.riderName,
       rosterSlot: row.rosterSlot,
-      championshipCountryId: row.championshipCountryId,
-      iso2: row.iso2,
-      iso3: row.iso3,
-      countryName: row.countryName,
+      championshipClubId: row.championshipClubId,
+      clubName: row.clubName,
     });
   }
 
-  return { riders: riderMap, countries: countryMap };
+  return { riders: riderMap, clubs: clubMap };
 }
 
 export interface ChampionshipResults {

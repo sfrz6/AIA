@@ -6,7 +6,7 @@ import { getDb } from "@/db";
 import { requirePermission } from "@/lib/auth/authorize";
 import { getRunContext } from "@/server/services/championships";
 import {
-  confirmCountryEntryOrder,
+  confirmClubEntryOrder,
   confirmRun,
   correctConfirmedRun,
   listEventRunIds,
@@ -19,7 +19,7 @@ import { DomainError, ok, run as guard, type ActionResult } from "./result";
 const entryOrderSchema = z
   .object({
     runId: z.uuid(),
-    championshipCountryId: z.uuid(),
+    championshipClubId: z.uuid(),
     decision: z.enum(["NO_CHANGE", "CHANGED"]),
     order: z.array(z.uuid()).max(16).optional(),
   })
@@ -52,9 +52,9 @@ export async function confirmEntryOrderAction(
     }
 
     await getDb().transaction((tx) =>
-      confirmCountryEntryOrder(tx, actor, {
+      confirmClubEntryOrder(tx, actor, {
         runId: parsed.data.runId,
-        championshipCountryId: parsed.data.championshipCountryId,
+        championshipClubId: parsed.data.championshipClubId,
         decision: parsed.data.decision,
         order: parsed.data.order,
       }),

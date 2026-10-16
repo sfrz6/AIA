@@ -3,8 +3,8 @@ import { scoreRun, aggregateRuns, type RunScoringInput } from "@/domain/scoring/
 import { allowedTargetPoints, getEventTypeDefinition, maxUnitPoints } from "@/domain/scoring/event-types";
 import { calculateTimePenalty } from "@/domain/scoring/penalty";
 
-const OMAN = "country-oman";
-const JORDAN = "country-jordan";
+const OMAN = "club-oman";
+const JORDAN = "club-jordan";
 
 function individualRun(
   riders: Array<{ id: string; points: number | null; time: number | null }>,
@@ -15,7 +15,7 @@ function individualRun(
     timeLimitSeconds,
     units: riders.map((rider, index) => ({
       unitIndex: index,
-      championshipCountryId: OMAN,
+      championshipClubId: OMAN,
       timeSeconds: rider.time,
       riders: [{ championshipRiderId: rider.id, positionInUnit: 1, targets: [rider.points] }],
     })),
@@ -73,11 +73,11 @@ describe("individual events", () => {
     expect(detail.cappedByEventMaximum).toBe(true);
   });
 
-  it("attributes no penalty to the country", () => {
+  it("attributes no penalty to the club", () => {
     const result = scoreRun(individualRun([{ id: "r1", points: 6, time: 30 }]));
-    expect(result.countries).toHaveLength(1);
-    expect(result.countries[0]!.countryPenaltyTotal.toString()).toBe("0");
-    expect(result.countries[0]!.total.toString()).toBe("0");
+    expect(result.clubs).toHaveLength(1);
+    expect(result.clubs[0]!.clubPenaltyTotal.toString()).toBe("0");
+    expect(result.clubs[0]!.total.toString()).toBe("0");
   });
 
   it("treats a missing score as zero and reports the run as incomplete", () => {
@@ -95,7 +95,7 @@ describe("pair events", () => {
     timeLimitSeconds: "7.00",
     units: pairs.map((pair, index) => ({
       unitIndex: index,
-      championshipCountryId: OMAN,
+      championshipClubId: OMAN,
       timeSeconds: pair.time,
       riders: pair.riders.map((rider, position) => ({
         championshipRiderId: rider.id,
@@ -105,7 +105,7 @@ describe("pair events", () => {
     })),
   });
 
-  it("keeps the pair penalty off the riders and on the country", () => {
+  it("keeps the pair penalty off the riders and on the club", () => {
     const result = scoreRun(
       pairRun([
         {
@@ -123,9 +123,9 @@ describe("pair events", () => {
     expect(byId.get("p2")!.individualContribution.toString()).toBe("4");
 
     expect(result.units[0]!.penalty.toString()).toBe("-1.5");
-    expect(result.countries[0]!.riderPointsTotal.toString()).toBe("10");
-    expect(result.countries[0]!.countryPenaltyTotal.toString()).toBe("-1.5");
-    expect(result.countries[0]!.total.toString()).toBe("8.5");
+    expect(result.clubs[0]!.riderPointsTotal.toString()).toBe("10");
+    expect(result.clubs[0]!.clubPenaltyTotal.toString()).toBe("-1.5");
+    expect(result.clubs[0]!.total.toString()).toBe("8.5");
   });
 
   it("floors the pair penalty at the pair's combined points", () => {
@@ -144,7 +144,7 @@ describe("pair events", () => {
     expect(result.units[0]!.netPoints.toString()).toBe("0");
     // The riders still carry their raw points into the individual standings.
     expect(result.riders[0]!.individualContribution.toString()).toBe("2");
-    expect(result.countries[0]!.total.toString()).toBe("0");
+    expect(result.clubs[0]!.total.toString()).toBe("0");
   });
 
   it("caps the pair penalty at twelve points", () => {
@@ -163,7 +163,7 @@ describe("pair events", () => {
     expect(result.units[0]!.netPoints.toString()).toBe("0");
   });
 
-  it("sums both pairs of a country", () => {
+  it("sums both pairs of a club", () => {
     const result = scoreRun(
       pairRun([
         {
@@ -182,9 +182,9 @@ describe("pair events", () => {
         },
       ]),
     );
-    expect(result.countries[0]!.riderPointsTotal.toString()).toBe("18");
-    expect(result.countries[0]!.countryPenaltyTotal.toString()).toBe("-0.5");
-    expect(result.countries[0]!.total.toString()).toBe("17.5");
+    expect(result.clubs[0]!.riderPointsTotal.toString()).toBe("18");
+    expect(result.clubs[0]!.clubPenaltyTotal.toString()).toBe("-0.5");
+    expect(result.clubs[0]!.total.toString()).toBe("17.5");
   });
 });
 
@@ -199,7 +199,7 @@ describe("team and relay events", () => {
     units: [
       {
         unitIndex: 0,
-        championshipCountryId: JORDAN,
+        championshipClubId: JORDAN,
         timeSeconds: time,
         riders: points.map((value, index) => ({
           championshipRiderId: `t${index + 1}`,
@@ -214,7 +214,7 @@ describe("team and relay events", () => {
     const result = scoreRun(teamRun("TEAM_LANCE", [6, 6, 4, 2], 10)); // 3 s over
     expect(result.units[0]!.rawPoints.toString()).toBe("18");
     expect(result.units[0]!.penalty.toString()).toBe("-1.5");
-    expect(result.countries[0]!.total.toString()).toBe("16.5");
+    expect(result.clubs[0]!.total.toString()).toBe("16.5");
     for (const rider of result.riders) {
       expect(rider.individualContribution.equals(rider.rawPoints)).toBe(true);
     }
@@ -223,7 +223,7 @@ describe("team and relay events", () => {
   it("caps the team penalty at twenty four points", () => {
     const result = scoreRun(teamRun("TEAM_LANCE", [6, 6, 6, 6], 200));
     expect(result.units[0]!.penalty.toString()).toBe("-24");
-    expect(result.countries[0]!.total.toString()).toBe("0");
+    expect(result.clubs[0]!.total.toString()).toBe("0");
   });
 
   it("uses the ten second relay limit", () => {
@@ -241,7 +241,7 @@ describe("rings and peg, lemons and peg", () => {
     units: [
       {
         unitIndex: 0,
-        championshipCountryId: OMAN,
+        championshipClubId: OMAN,
         timeSeconds: time,
         riders: [{ championshipRiderId: "m1", positionInUnit: 1, targets }],
       },
@@ -252,7 +252,7 @@ describe("rings and peg, lemons and peg", () => {
     const result = scoreRun(multiRun([6, 4, 2], 9)); // 2 s over, -1
     expect(result.riders[0]!.rawPoints.toString()).toBe("12");
     expect(result.riders[0]!.netPoints.toString()).toBe("11");
-    expect(result.countries[0]!.countryPenaltyTotal.toString()).toBe("0");
+    expect(result.clubs[0]!.clubPenaltyTotal.toString()).toBe("0");
   });
 
   it("caps the penalty at eighteen points", () => {
@@ -289,14 +289,14 @@ describe("rings and peg, lemons and peg", () => {
 });
 
 describe("aggregating runs into an event", () => {
-  it("adds rider contributions and country penalties across runs", () => {
+  it("adds rider contributions and club penalties across runs", () => {
     const run1 = scoreRun({
       eventTypeKey: "TEAM_SWORD",
       timeLimitSeconds: "7.00",
       units: [
         {
           unitIndex: 0,
-          championshipCountryId: JORDAN,
+          championshipClubId: JORDAN,
           timeSeconds: 8,
           riders: [
             { championshipRiderId: "a", positionInUnit: 1, targets: [6] },
@@ -311,7 +311,7 @@ describe("aggregating runs into an event", () => {
       units: [
         {
           unitIndex: 0,
-          championshipCountryId: JORDAN,
+          championshipClubId: JORDAN,
           timeSeconds: 7,
           riders: [
             { championshipRiderId: "a", positionInUnit: 1, targets: [2] },
@@ -324,7 +324,7 @@ describe("aggregating runs into an event", () => {
     const aggregate = aggregateRuns([run1, run2]);
     expect(aggregate.riderTotals.get("a")!.toString()).toBe("8");
     expect(aggregate.riderTotals.get("b")!.toString()).toBe("10");
-    expect(aggregate.countryRiderTotals.get(JORDAN)!.toString()).toBe("18");
-    expect(aggregate.countryPenaltyTotals.get(JORDAN)!.toString()).toBe("-0.5");
+    expect(aggregate.clubRiderTotals.get(JORDAN)!.toString()).toBe("18");
+    expect(aggregate.clubPenaltyTotals.get(JORDAN)!.toString()).toBe("-0.5");
   });
 });

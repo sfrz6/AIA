@@ -1,1 +1,0 @@
-ALTER TABLE "championships" ADD COLUMN "name_ar" text;

@@ -1,13 +1,13 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
-  championshipCountries,
+  championshipClubs,
   championshipDays,
   championshipEvents,
   championshipRiders,
   championshipRuns,
   championships,
-  countries,
+  clubs,
   riders,
 } from "@/db/schema";
 import type { EventTypeKey } from "@/domain/scoring/event-types";
@@ -23,7 +23,7 @@ export interface ChampionshipSummary {
   readonly organizer: string | null;
   readonly status: "DRAFT" | "ACTIVE" | "COMPLETED";
   readonly isPublished: boolean;
-  readonly countryCount: number;
+  readonly clubCount: number;
   readonly confirmedRuns: number;
   readonly totalRuns: number;
 }
@@ -35,9 +35,9 @@ export interface ChampionshipSummary {
  * silently returns the wrong count. Spelling the correlation out keeps it
  * unambiguous.
  */
-const countryCountExpression = sql<number>`(
+const clubCountExpression = sql<number>`(
   select count(*)::int
-  from championship_countries cc
+  from championship_clubs cc
   where cc.championship_id = championships.id
 )`;
 
@@ -73,7 +73,7 @@ export async function listChampionships(options: {
       organizer: championships.organizer,
       status: championships.status,
       isPublished: championships.isPublished,
-      countryCount: countryCountExpression,
+      clubCount: clubCountExpression,
       confirmedRuns: confirmedRunCountExpression,
       totalRuns: runCountExpression,
     })
@@ -128,7 +128,7 @@ export async function getChampionshipDetail(
       status: championships.status,
       isPublished: championships.isPublished,
       sourceTemplateName: championships.sourceTemplateName,
-      countryCount: countryCountExpression,
+      clubCount: clubCountExpression,
       confirmedRuns: confirmedRunCountExpression,
       totalRuns: runCountExpression,
     })
@@ -212,42 +212,38 @@ export async function getChampionshipDetail(
   };
 }
 
-export interface ChampionshipCountryRecord {
-  readonly championshipCountryId: string;
-  readonly countryId: string;
-  readonly iso2: string;
-  readonly iso3: string;
+export interface ChampionshipClubRecord {
+  readonly championshipClubId: string;
+  readonly clubId: string;
   readonly name: string;
   /** Start list position (team 1, team 2, ...), 0-based. */
   readonly orderIndex: number;
 }
 
 /**
- * A championship's countries, in start list order.
+ * A championship's clubs, in start list order.
  *
- * This is the order the country was given on the Participants page, not
- * alphabetical, because it drives the display order everywhere countries are
+ * This is the order the club was given on the Participants page, not
+ * alphabetical, because it drives the display order everywhere clubs are
  * listed: entry orders, scoring, round sheets and results.
  */
-export async function listChampionshipCountries(
+export async function listChampionshipClubs(
   championshipId: string,
   locale: Locale,
-): Promise<readonly ChampionshipCountryRecord[]> {
+): Promise<readonly ChampionshipClubRecord[]> {
   const db = getDb();
-  const name = locale === "ar" ? countries.nameAr : countries.nameEn;
+  const name = locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
   return db
     .select({
-      championshipCountryId: championshipCountries.id,
-      countryId: countries.id,
-      iso2: countries.iso2,
-      iso3: countries.iso3,
+      championshipClubId: championshipClubs.id,
+      clubId: clubs.id,
       name,
-      orderIndex: championshipCountries.orderIndex,
+      orderIndex: championshipClubs.orderIndex,
     })
-    .from(championshipCountries)
-    .innerJoin(countries, eq(countries.id, championshipCountries.countryId))
-    .where(eq(championshipCountries.championshipId, championshipId))
-    .orderBy(asc(championshipCountries.orderIndex));
+    .from(championshipClubs)
+    .innerJoin(clubs, eq(clubs.id, championshipClubs.clubId))
+    .where(eq(championshipClubs.championshipId, championshipId))
+    .orderBy(asc(championshipClubs.orderIndex));
 }
 
 export interface ChampionshipRiderRecord {
@@ -256,10 +252,9 @@ export interface ChampionshipRiderRecord {
   readonly fullName: string;
   readonly rosterSlot: "ACTIVE" | "RESERVE";
   readonly initialOrder: number | null;
-  readonly championshipCountryId: string;
-  readonly countryId: string;
-  readonly iso2: string;
-  readonly countryName: string;
+  readonly championshipClubId: string;
+  readonly clubId: string;
+  readonly clubName: string;
 }
 
 export async function listChampionshipRiders(
@@ -267,7 +262,8 @@ export async function listChampionshipRiders(
   locale: Locale,
 ): Promise<readonly ChampionshipRiderRecord[]> {
   const db = getDb();
-  const countryName = locale === "ar" ? countries.nameAr : countries.nameEn;
+  const clubName =
+    locale === "ar" ? sql<string>`coalesce(${clubs.nameAr}, ${clubs.name})` : clubs.name;
   return db
     .select({
       championshipRiderId: championshipRiders.id,
@@ -275,21 +271,20 @@ export async function listChampionshipRiders(
       fullName: riders.fullName,
       rosterSlot: championshipRiders.rosterSlot,
       initialOrder: championshipRiders.initialOrder,
-      championshipCountryId: championshipCountries.id,
-      countryId: countries.id,
-      iso2: countries.iso2,
-      countryName,
+      championshipClubId: championshipClubs.id,
+      clubId: clubs.id,
+      clubName,
     })
     .from(championshipRiders)
     .innerJoin(
-      championshipCountries,
-      eq(championshipCountries.id, championshipRiders.championshipCountryId),
+      championshipClubs,
+      eq(championshipClubs.id, championshipRiders.championshipClubId),
     )
-    .innerJoin(countries, eq(countries.id, championshipCountries.countryId))
+    .innerJoin(clubs, eq(clubs.id, championshipClubs.clubId))
     .innerJoin(riders, eq(riders.id, championshipRiders.riderId))
-    .where(eq(championshipCountries.championshipId, championshipId))
+    .where(eq(championshipClubs.championshipId, championshipId))
     .orderBy(
-      asc(championshipCountries.orderIndex),
+      asc(championshipClubs.orderIndex),
       asc(championshipRiders.rosterSlot),
       asc(championshipRiders.initialOrder),
     );
@@ -395,7 +390,7 @@ export async function getChampionshipBySlug(slug: string): Promise<ChampionshipS
       organizer: championships.organizer,
       status: championships.status,
       isPublished: championships.isPublished,
-      countryCount: countryCountExpression,
+      clubCount: clubCountExpression,
       confirmedRuns: confirmedRunCountExpression,
       totalRuns: runCountExpression,
     })

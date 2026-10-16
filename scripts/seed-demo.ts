@@ -1,10 +1,10 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import {
   championshipDays,
   championshipEvents,
   championshipRuns,
   championshipTemplates,
-  countries,
+  clubs,
   riders,
   templateDays,
   templateEvents,
@@ -21,7 +21,7 @@ import {
   type SquadInput,
 } from "@/server/services/championship-setup";
 import {
-  confirmCountryEntryOrder,
+  confirmClubEntryOrder,
   confirmRun,
   getRunScoringState,
   saveRunScores,
@@ -35,7 +35,7 @@ loadEnv();
 
 /**
  * Creates a realistic championship to explore: the full three day structure
- * from the reference workbook, four countries, twenty riders, and the opening
+ * from the reference workbook, four clubs, twenty riders, and the opening
  * Individual Lance run already scored and confirmed so the standings, the
  * public results page and the correction workflow all have something to show.
  *
@@ -43,9 +43,8 @@ loadEnv();
  * command refuses to touch a database that already holds a championship.
  */
 
-const TEMPLATE_NAME = "Demo: ITPF three day championship";
+const TEMPLATE_NAME = "Demo: AIA championship";
 const CHAMPIONSHIP_NAME = "Demo: WC Qualifying Tournament, Jordan 2026";
-const DEMO_COUNTRIES = ["JO", "OM", "AE", "PK"] as const;
 
 const STRUCTURE: ReadonlyArray<{ day: 1 | 2 | 3; event: EventTypeKey; runs: number }> = [
   { day: 1, event: "INDIVIDUAL_LANCE", runs: 2 },
@@ -60,12 +59,24 @@ const STRUCTURE: ReadonlyArray<{ day: 1 | 2 | 3; event: EventTypeKey; runs: numb
   { day: 3, event: "RELAY_SWORD", runs: 2 },
 ];
 
-const RIDER_NAMES: Record<string, readonly string[]> = {
-  JO: ["Faris Al Majali", "Omar Al Tarawneh", "Yazan Al Hadid", "Rakan Al Shobaki", "Mutaz Al Fayez"],
-  OM: ["Salim Al Harthy", "Khalid Al Riyami", "Nasser Al Balushi", "Hamad Al Saadi", "Talal Al Hinai"],
-  AE: ["Rashid Al Mansoori", "Saeed Al Ketbi", "Hamdan Al Nuaimi", "Majid Al Shamsi", "Khalifa Al Suwaidi"],
-  PK: ["Imran Baig", "Zafar Abbas", "Sohail Akhtar", "Bilal Nadeem", "Usman Tariq"],
-};
+const DEMO_CLUBS: ReadonlyArray<{ name: string; riders: readonly string[] }> = [
+  {
+    name: "Royal Jordanian Club",
+    riders: ["Faris Al Majali", "Omar Al Tarawneh", "Yazan Al Hadid", "Rakan Al Shobaki", "Mutaz Al Fayez"],
+  },
+  {
+    name: "Assayel International Academy",
+    riders: ["Salim Al Harthy", "Khalid Al Riyami", "Nasser Al Balushi", "Hamad Al Saadi", "Talal Al Hinai"],
+  },
+  {
+    name: "Al Ain Tent Pegging Club",
+    riders: ["Rashid Al Mansoori", "Saeed Al Ketbi", "Hamdan Al Nuaimi", "Majid Al Shamsi", "Khalifa Al Suwaidi"],
+  },
+  {
+    name: "Lahore Cavalry Club",
+    riders: ["Imran Baig", "Zafar Abbas", "Sohail Akhtar", "Bilal Nadeem", "Usman Tariq"],
+  },
+];
 
 /** Deterministic, so the demo looks the same every time it is seeded. */
 function makeRandom(seed: number): () => number {
@@ -152,18 +163,29 @@ async function main(): Promise<void> {
     }
   }
 
-  // Riders, registered permanently under their country.
-  const participating = await db
-    .select({ id: countries.id, iso2: countries.iso2, name: countries.nameEn })
-    .from(countries)
-    .where(inArray(countries.iso2, [...DEMO_COUNTRIES]));
-
+  // Clubs and riders, registered permanently (clubs by name only, same as
+  // the Clubs page would create them).
   const squads: SquadInput[] = [];
-  for (const country of participating) {
-    const names = RIDER_NAMES[country.iso2] ?? [];
+  for (const demoClub of DEMO_CLUBS) {
+    const [club] = await db
+      .insert(clubs)
+      .values({ name: demoClub.name })
+      .onConflictDoNothing()
+      .returning({ id: clubs.id });
+
+    const clubRow =
+      club ??
+      (await db
+        .select({ id: clubs.id })
+        .from(clubs)
+        .where(eq(clubs.name, demoClub.name))
+        .limit(1))[0];
+    if (!clubRow) continue;
+
+    const names = demoClub.riders;
     const created = await db
       .insert(riders)
-      .values(names.map((fullName) => ({ countryId: country.id, fullName })))
+      .values(names.map((fullName) => ({ clubId: clubRow.id, fullName })))
       .onConflictDoNothing()
       .returning({ id: riders.id });
 
@@ -174,13 +196,13 @@ async function main(): Promise<void> {
             await db
               .select({ id: riders.id })
               .from(riders)
-              .where(eq(riders.countryId, country.id))
+              .where(eq(riders.clubId, clubRow.id))
               .orderBy(asc(riders.fullName))
               .limit(5)
           ).map((rider) => rider.id);
 
     squads.push({
-      countryId: country.id,
+      clubId: clubRow.id,
       riders: riderIds.map((riderId, index) => ({
         riderId,
         rosterSlot: index < 4 ? "ACTIVE" : "RESERVE",
@@ -224,11 +246,11 @@ async function main(): Promise<void> {
   const entryOrders = await getRunEntryOrderState(firstRun.id, "en");
   if (!entryOrders) fail("Could not read the demo run.");
 
-  for (const country of entryOrders.countries) {
+  for (const club of entryOrders.clubs) {
     await db.transaction((tx) =>
-      confirmCountryEntryOrder(tx, actor, {
+      confirmClubEntryOrder(tx, actor, {
         runId: firstRun.id,
-        championshipCountryId: country.championshipCountryId,
+        championshipClubId: club.championshipClubId,
         decision: "NO_CHANGE",
       }),
     );
@@ -249,8 +271,8 @@ async function main(): Promise<void> {
   const units: Array<{ runScoringUnitId: string; timeSeconds: string | null }> = [];
   const scores: Array<{ runScoreId: string; targets: Array<number | null> }> = [];
 
-  for (const country of scoring.countries) {
-    for (const unit of country.units) {
+  for (const club of scoring.clubs) {
+    for (const unit of club.units) {
       // A spread of realistic times around the 6.40 s limit, so some riders
       // take a penalty and the standings are not all level.
       const seconds = 5.8 + random() * 2.4;
@@ -284,8 +306,8 @@ async function main(): Promise<void> {
 
     Template       ${TEMPLATE_NAME}
     Championship   ${CHAMPIONSHIP_NAME}
-    Countries      ${participating.map((c) => c.name).join(", ")}
-    Riders         ${participating.length * 5} (4 active and 1 reserve each)
+    Clubs      ${DEMO_CLUBS.map((c) => c.name).join(", ")}
+    Riders         ${DEMO_CLUBS.length * 5} (4 active and 1 reserve each)
     Runs           ${STRUCTURE.reduce((total, entry) => total + entry.runs, 0)} across 3 days
     Scored         Individual Lance, run 1, confirmed
 

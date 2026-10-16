@@ -9,28 +9,28 @@ const omanRiders = ["o1", "o2", "o3", "o4"];
 const jordanRiders = ["j1", "j2", "j3", "j4"];
 
 function individualUnits(
-  countryId: string,
+  clubId: string,
   riderIds: readonly string[],
   points: readonly number[],
   times: readonly number[],
 ): ScoringUnitInput[] {
   return riderIds.map((id, index) => ({
     unitIndex: index,
-    championshipCountryId: countryId,
+    championshipClubId: clubId,
     timeSeconds: times[index] ?? 6,
     riders: [{ championshipRiderId: id, positionInUnit: 1, targets: [points[index] ?? 0] }],
   }));
 }
 
 function teamUnit(
-  countryId: string,
+  clubId: string,
   riderIds: readonly string[],
   points: readonly number[],
   time: number,
 ): ScoringUnitInput {
   return {
     unitIndex: 0,
-    championshipCountryId: countryId,
+    championshipClubId: clubId,
     timeSeconds: time,
     riders: riderIds.map((id, index) => ({
       championshipRiderId: id,
@@ -42,7 +42,7 @@ function teamUnit(
 
 /**
  * A miniature day 1 modelled on the workbook: individual lance (own penalty),
- * pair lance and team lance (country penalty).
+ * pair lance and team lance (club penalty).
  */
 const runs: ConfirmedRun[] = [
   {
@@ -67,7 +67,7 @@ const runs: ConfirmedRun[] = [
     units: [
       {
         unitIndex: 0,
-        championshipCountryId: OMAN,
+        championshipClubId: OMAN,
         timeSeconds: 8.0, // 1 s over, -0.5
         riders: [
           { championshipRiderId: "o1", positionInUnit: 1, targets: [6] },
@@ -76,7 +76,7 @@ const runs: ConfirmedRun[] = [
       },
       {
         unitIndex: 1,
-        championshipCountryId: OMAN,
+        championshipClubId: OMAN,
         timeSeconds: 7.0,
         riders: [
           { championshipRiderId: "o3", positionInUnit: 1, targets: [2] },
@@ -85,7 +85,7 @@ const runs: ConfirmedRun[] = [
       },
       {
         unitIndex: 0,
-        championshipCountryId: JORDAN,
+        championshipClubId: JORDAN,
         timeSeconds: 7.0,
         riders: [
           { championshipRiderId: "j1", positionInUnit: 1, targets: [6] },
@@ -94,7 +94,7 @@ const runs: ConfirmedRun[] = [
       },
       {
         unitIndex: 1,
-        championshipCountryId: JORDAN,
+        championshipClubId: JORDAN,
         timeSeconds: 7.0,
         riders: [
           { championshipRiderId: "j3", positionInUnit: 1, targets: [0] },
@@ -135,14 +135,14 @@ describe("championship aggregation", () => {
     expect(totals.riders.get("o2")!.byEvent.get("ev-tl")!.toString()).toBe("6");
   });
 
-  it("charges pair and team faults to the country, never to the rider", () => {
-    const oman = totals.countries.get(OMAN)!;
+  it("charges pair and team faults to the club, never to the rider", () => {
+    const oman = totals.clubs.get(OMAN)!;
     // 18 + 13.5 + (6 + 2 + 6) + (0 + 2 + 6) = 18 + 13.5 + 14 + 8 = 53.5
     expect(oman.riderPointsOverall.toString()).toBe("53.5");
     expect(oman.penaltiesOverall.toString()).toBe("-0.5");
     expect(oman.overall.toString()).toBe("53");
 
-    const jordan = totals.countries.get(JORDAN)!;
+    const jordan = totals.clubs.get(JORDAN)!;
     // riders: j1 6+6+2=14, j2 6+6+2=14, j3 2+0+2=4, j4 4+0+2=6 -> 38
     expect(jordan.riderPointsOverall.toString()).toBe("38");
     expect(jordan.penaltiesOverall.toString()).toBe("-2");
@@ -154,7 +154,7 @@ describe("championship aggregation", () => {
   });
 
   it("puts day one totals in the day one bucket and nothing elsewhere", () => {
-    const oman = totals.countries.get(OMAN)!;
+    const oman = totals.clubs.get(OMAN)!;
     expect(oman.byDay.get(1)!.toString()).toBe("53");
     expect(oman.byDay.has(2)).toBe(false);
   });
@@ -163,8 +163,8 @@ describe("championship aggregation", () => {
 describe("standings from aggregated totals", () => {
   const totals = aggregateChampionship(runs);
 
-  it("ranks countries by total", () => {
-    const standings = buildStandings(totals, { scope: "OVERALL", subject: "COUNTRY" });
+  it("ranks clubs by total", () => {
+    const standings = buildStandings(totals, { scope: "OVERALL", subject: "CLUB" });
     expect(standings.map((s) => s.key)).toEqual([OMAN, JORDAN]);
     expect(standings[0]!.rank).toBe(1);
   });
@@ -189,7 +189,7 @@ describe("standings from aggregated totals", () => {
 
   it("returns empty standings when no run is confirmed", () => {
     const empty = aggregateChampionship([]);
-    expect(buildStandings(empty, { scope: "OVERALL", subject: "COUNTRY" })).toEqual([]);
+    expect(buildStandings(empty, { scope: "OVERALL", subject: "CLUB" })).toEqual([]);
     expect(empty.daysWithResults).toEqual([]);
   });
 

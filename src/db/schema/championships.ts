@@ -19,7 +19,7 @@ import {
   runStatusEnum,
 } from "./enums";
 import { users } from "./identity";
-import { countries, riders } from "./registry";
+import { clubs, riders } from "./registry";
 import { championshipTemplates } from "./templates";
 
 export const championships = pgTable(
@@ -121,36 +121,36 @@ export const championshipRuns = pgTable(
   ],
 );
 
-/** A country taking part in a championship. */
-export const championshipCountries = pgTable(
-  "championship_countries",
+/** A club taking part in a championship. */
+export const championshipClubs = pgTable(
+  "championship_clubs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     championshipId: uuid("championship_id")
       .notNull()
       .references(() => championships.id, { onDelete: "cascade" }),
-    countryId: uuid("country_id")
+    clubId: uuid("club_id")
       .notNull()
-      .references(() => countries.id, { onDelete: "restrict" }),
+      .references(() => clubs.id, { onDelete: "restrict" }),
     /**
-     * The country's position in the start list (team 1, team 2, ...), 0-based.
-     * Set when the country is added and editable from the Participants page
+     * The club's position in the start list (team 1, team 2, ...), 0-based.
+     * Set when the club is added and editable from the Participants page
      * until the first run of the championship actually starts. Drives the
-     * display order everywhere countries are listed: participants, entry
+     * display order everywhere clubs are listed: participants, entry
      * orders, scoring, round sheets and results.
      */
     orderIndex: integer("order_index").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("championship_countries_unique_idx").on(table.championshipId, table.countryId),
-    uniqueIndex("championship_countries_order_idx").on(table.championshipId, table.orderIndex),
-    index("championship_countries_championship_idx").on(table.championshipId),
+    uniqueIndex("championship_clubs_unique_idx").on(table.championshipId, table.clubId),
+    uniqueIndex("championship_clubs_order_idx").on(table.championshipId, table.orderIndex),
+    index("championship_clubs_championship_idx").on(table.championshipId),
   ],
 );
 
 /**
- * A rider's participation in one championship, for one country.
+ * A rider's participation in one championship, for one club.
  *
  * Active or reserve is a property of the participation, never of the rider: the
  * same rider can be active in one championship and reserve in the next.
@@ -159,9 +159,9 @@ export const championshipRiders = pgTable(
   "championship_riders",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    championshipCountryId: uuid("championship_country_id")
+    championshipClubId: uuid("championship_club_id")
       .notNull()
-      .references(() => championshipCountries.id, { onDelete: "cascade" }),
+      .references(() => championshipClubs.id, { onDelete: "cascade" }),
     riderId: uuid("rider_id")
       .notNull()
       .references(() => riders.id, { onDelete: "restrict" }),
@@ -171,11 +171,11 @@ export const championshipRiders = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("championship_riders_unique_idx").on(table.championshipCountryId, table.riderId),
+    uniqueIndex("championship_riders_unique_idx").on(table.championshipClubId, table.riderId),
     uniqueIndex("championship_riders_order_idx")
-      .on(table.championshipCountryId, table.initialOrder)
+      .on(table.championshipClubId, table.initialOrder)
       .where(sql`${table.initialOrder} is not null`),
-    index("championship_riders_country_idx").on(table.championshipCountryId),
+    index("championship_riders_club_idx").on(table.championshipClubId),
     check(
       "championship_riders_order_check",
       sql`(${table.rosterSlot} = 'ACTIVE' and ${table.initialOrder} between 1 and 4)
@@ -186,7 +186,7 @@ export const championshipRiders = pgTable(
 
 export const championshipsRelations = relations(championships, ({ many, one }) => ({
   days: many(championshipDays),
-  countries: many(championshipCountries),
+  clubs: many(championshipClubs),
   sourceTemplate: one(championshipTemplates, {
     fields: [championships.sourceTemplateId],
     references: [championshipTemplates.id],
@@ -216,25 +216,22 @@ export const championshipRunsRelations = relations(championshipRuns, ({ one }) =
   }),
 }));
 
-export const championshipCountriesRelations = relations(
-  championshipCountries,
-  ({ one, many }) => ({
-    championship: one(championships, {
-      fields: [championshipCountries.championshipId],
-      references: [championships.id],
-    }),
-    country: one(countries, {
-      fields: [championshipCountries.countryId],
-      references: [countries.id],
-    }),
-    riders: many(championshipRiders),
+export const championshipClubsRelations = relations(championshipClubs, ({ one, many }) => ({
+  championship: one(championships, {
+    fields: [championshipClubs.championshipId],
+    references: [championships.id],
   }),
-);
+  club: one(clubs, {
+    fields: [championshipClubs.clubId],
+    references: [clubs.id],
+  }),
+  riders: many(championshipRiders),
+}));
 
 export const championshipRidersRelations = relations(championshipRiders, ({ one }) => ({
-  championshipCountry: one(championshipCountries, {
-    fields: [championshipRiders.championshipCountryId],
-    references: [championshipCountries.id],
+  championshipClub: one(championshipClubs, {
+    fields: [championshipRiders.championshipClubId],
+    references: [championshipClubs.id],
   }),
   rider: one(riders, { fields: [championshipRiders.riderId], references: [riders.id] }),
 }));

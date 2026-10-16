@@ -3,7 +3,6 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
-import { CountryFlag } from "@/components/common/country-flag";
 import { Badge, EmptyState } from "@/components/ui/surfaces";
 import { Table, TBody, Td, TdNum, THead, Th, ThNum, TableWrapper, Tr } from "@/components/ui/table";
 import { useI18n } from "@/lib/i18n/client";
@@ -94,7 +93,7 @@ function useHorizontalScrollEdges<T extends HTMLElement>(): {
 /**
  * The name column only has room for a line or two before it starts crowding
  * the sticky rank/total columns, so long names (a long transliterated rider
- * name, or a long country name on a narrow screen) still get cut off with an
+ * name, or a long club name on a narrow screen) still get cut off with an
  * ellipsis. Clicking the text reveals the full name in a small floating
  * popup instead of silently hiding part of it with no way to read the rest.
  */
@@ -183,7 +182,7 @@ export function StandingsTable({
     return <EmptyState title={t("results.noData")} />;
   }
 
-  const isCountry = subject === "COUNTRY";
+  const isClub = subject === "CLUB";
   const showDayBreakdown = scope === "OVERALL" && days.length > 1;
 
   return (
@@ -199,12 +198,12 @@ export function StandingsTable({
               {t("common.rank")}
             </ThNum>
             <Th className={cn(STICKY_NAME, "min-w-40 bg-surface-sunken border-e border-border")}>
-              {isCountry ? t("common.country") : t("common.rider")}
+              {isClub ? t("common.club") : t("common.rider")}
             </Th>
-            {isCountry ? (
+            {isClub ? (
               <>
                 <ThNum className="whitespace-nowrap">{t("results.riderPoints")}</ThNum>
-                <ThNum className="whitespace-nowrap">{t("results.countryFaults")}</ThNum>
+                <ThNum className="whitespace-nowrap">{t("results.clubFaults")}</ThNum>
               </>
             ) : null}
             {showDayBreakdown
@@ -236,13 +235,12 @@ export function StandingsTable({
                 </TdNum>
                 <Td className={cn(STICKY_NAME, "min-w-40 bg-surface-raised border-e border-border")}>
                   <span className="flex items-center gap-2">
-                    <CountryFlag iso2={row.iso2} className="shrink-0" />
                     <span className="min-w-0 max-w-64 flex-1">
                       <TruncatedName text={row.name} />
-                      {isCountry ? null : (
+                      {isClub ? null : (
                         <span className="flex items-center gap-1">
                           <span className="min-w-0 truncate text-xs text-muted">
-                            {row.countryName}
+                            {row.clubName}
                           </span>
                           {row.isTiedAfterTieBreak && isPodium ? (
                             <Badge tone="warning" className="shrink-0 px-1 py-0 text-[0.625rem]">
@@ -252,17 +250,17 @@ export function StandingsTable({
                         </span>
                       )}
                     </span>
-                    {isCountry && row.isTiedAfterTieBreak && isPodium ? (
+                    {isClub && row.isTiedAfterTieBreak && isPodium ? (
                       <Badge tone="warning" className="shrink-0 px-1 py-0 text-[0.625rem]">
                         {t("results.tied")}
                       </Badge>
                     ) : null}
                   </span>
                 </Td>
-                {isCountry ? (
+                {isClub ? (
                   <>
                     <TdNum className="text-muted">{row.riderPoints}</TdNum>
-                    <TdNum className="text-muted">{row.countryFaults}</TdNum>
+                    <TdNum className="text-muted">{row.clubFaults}</TdNum>
                   </>
                 ) : null}
                 {showDayBreakdown

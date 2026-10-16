@@ -2,13 +2,13 @@ import { type Decimal, dec, ZERO, type Numeric } from "./decimal";
 import { calculateTimePenalty } from "./penalty";
 
 export interface StandingEntryInput {
-  /** Stable identity of the competitor or country being ranked. */
+  /** Stable identity of the competitor or club being ranked. */
   readonly key: string;
   readonly total: Numeric;
 }
 
 /**
- * One competitor's or country's result in a tie-break round (the "round of
+ * One competitor's or club's result in a tie-break round (the "round of
  * draws" in the reference workbook).
  */
 export interface TieBreakEntryInput {

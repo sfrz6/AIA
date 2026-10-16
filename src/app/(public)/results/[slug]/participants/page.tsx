@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { ItpfLogo } from "@/components/common/itpf-logo";
-import { CountryFlag } from "@/components/common/country-flag";
+import { AiaLogo } from "@/components/common/aia-logo";
 import { championshipDisplayName } from "@/components/common/formatting";
 import { Card, CardContent, CardHeader, CardTitle, EmptyState } from "@/components/ui/surfaces";
 import { getTranslator } from "@/lib/i18n/server";
 import {
   getChampionshipBySlug,
-  listChampionshipCountries,
+  listChampionshipClubs,
   listChampionshipRiders,
 } from "@/server/services/championships";
 
@@ -47,8 +46,8 @@ export default async function PublicParticipantsPage({
   const championship = await getChampionshipBySlug(slug);
   if (!championship) notFound();
 
-  const [countries, riders] = await Promise.all([
-    listChampionshipCountries(championship.id, locale),
+  const [clubs, riders] = await Promise.all([
+    listChampionshipClubs(championship.id, locale),
     listChampionshipRiders(championship.id, locale),
   ]);
 
@@ -63,31 +62,30 @@ export default async function PublicParticipantsPage({
       </Link>
 
       <header className="flex flex-wrap items-start gap-4">
-        <ItpfLogo width={56} priority />
+        <AiaLogo width={56} priority />
         <div className="min-w-0 flex-1 space-y-1">
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
             {championshipDisplayName(championship.name, championship.nameAr, locale)}
           </h1>
-          <p className="text-xs text-muted">{t("publicResults.participatingCountries")}</p>
+          <p className="text-xs text-muted">{t("publicResults.participatingClubs")}</p>
         </div>
       </header>
 
-      {countries.length === 0 ? (
+      {clubs.length === 0 ? (
         <EmptyState title={t("publicResults.noParticipantsYet")} />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
-          {countries.map((country) => {
+          {clubs.map((club) => {
             const squad = riders.filter(
-              (rider) => rider.championshipCountryId === country.championshipCountryId,
+              (rider) => rider.championshipClubId === club.championshipClubId,
             );
 
             return (
-              <li key={country.championshipCountryId}>
+              <li key={club.championshipClubId}>
                 <Card className="h-full">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
-                      <CountryFlag iso2={country.iso2} size="md" />
-                      <span className="truncate">{country.name}</span>
+                      <span className="truncate">{club.name}</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">

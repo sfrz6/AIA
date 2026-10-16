@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Flag, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Shield, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Select } from "@/components/ui/form-controls";
@@ -16,15 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CountryLabel } from "@/components/common/country-flag";
 import { useI18n } from "@/lib/i18n/client";
 import {
-  addChampionshipCountryAction,
-  removeChampionshipCountryAction,
-  reorderChampionshipCountriesAction,
+  addChampionshipClubAction,
+  removeChampionshipClubAction,
+  reorderChampionshipClubsAction,
   replaceSquadAction,
 } from "@/server/actions/championships";
-import { listCountryRidersAction } from "@/server/actions/registry-queries";
+import { listClubRidersAction } from "@/server/actions/registry-queries";
 import {
   SquadPicker,
   isSquadSavable,
@@ -41,37 +40,35 @@ export interface ParticipantSquadRider {
   readonly initialOrder: number | null;
 }
 
-export interface ParticipantCountry {
-  readonly championshipCountryId: string;
-  readonly countryId: string;
-  readonly iso2: string;
+export interface ParticipantClub {
+  readonly championshipClubId: string;
+  readonly clubId: string;
   readonly name: string;
   /** The nominated squad: four active riders in starting order plus a reserve. */
   readonly squad: readonly ParticipantSquadRider[];
-  /** Riders this country has on its permanent registry. */
+  /** Riders this club has on its permanent registry. */
   readonly registry: readonly SquadRiderOption[];
 }
 
-export interface AvailableCountry {
+export interface AvailableClub {
   readonly id: string;
-  readonly iso2: string;
   readonly name: string;
   readonly riderCount: number;
 }
 
 export function ParticipantsManager({
   championshipId,
-  countries,
-  availableCountries,
+  clubs,
+  availableClubs,
   canManageRiders,
-  canManageCountries,
+  canManageClubs,
   championshipStarted,
 }: {
   championshipId: string;
-  countries: readonly ParticipantCountry[];
-  availableCountries: readonly AvailableCountry[];
+  clubs: readonly ParticipantClub[];
+  availableClubs: readonly AvailableClub[];
   canManageRiders: boolean;
-  canManageCountries: boolean;
+  canManageClubs: boolean;
   /** Once the championship's first run has started, the start list locks. */
   championshipStarted: boolean;
 }) {
@@ -80,20 +77,20 @@ export function ParticipantsManager({
   const [pending, startTransition] = React.useTransition();
   const [reordering, setReordering] = React.useState(false);
 
-  const canReorder = canManageCountries && !championshipStarted && countries.length > 1;
+  const canReorder = canManageClubs && !championshipStarted && clubs.length > 1;
 
-  function moveCountry(index: number, direction: -1 | 1) {
+  function moveClub(index: number, direction: -1 | 1) {
     const target = index + direction;
-    if (target < 0 || target >= countries.length || reordering) return;
-    const next = [...countries];
+    if (target < 0 || target >= clubs.length || reordering) return;
+    const next = [...clubs];
     const moved = next[index]!;
     next[index] = next[target]!;
     next[target] = moved;
 
     setReordering(true);
-    void reorderChampionshipCountriesAction({
+    void reorderChampionshipClubsAction({
       championshipId,
-      orderedChampionshipCountryIds: next.map((country) => country.championshipCountryId),
+      orderedChampionshipClubIds: next.map((club) => club.championshipClubId),
     }).then((result) => {
       setReordering(false);
       if (!result.ok) {
@@ -106,10 +103,10 @@ export function ParticipantsManager({
 
   const [editing, setEditing] = React.useState<string | null>(null);
   const [editSelection, setEditSelection] = React.useState<SquadSelection>({});
-  const [removeTarget, setRemoveTarget] = React.useState<ParticipantCountry | null>(null);
+  const [removeTarget, setRemoveTarget] = React.useState<ParticipantClub | null>(null);
 
   const [addOpen, setAddOpen] = React.useState(false);
-  const [addCountryId, setAddCountryId] = React.useState("");
+  const [addClubId, setAddClubId] = React.useState("");
   const [addRiders, setAddRiders] = React.useState<readonly SquadRiderOption[]>([]);
   const [addSelection, setAddSelection] = React.useState<SquadSelection>({});
   const [addLoading, setAddLoading] = React.useState(false);
@@ -120,33 +117,33 @@ export function ParticipantsManager({
     Record<string, readonly SquadRiderOption[]>
   >({});
 
-  function ridersFor(country: ParticipantCountry): readonly SquadRiderOption[] {
+  function ridersFor(club: ParticipantClub): readonly SquadRiderOption[] {
     const byId = new Map<string, SquadRiderOption>();
-    for (const rider of country.registry) byId.set(rider.id, rider);
+    for (const rider of club.registry) byId.set(rider.id, rider);
     // A squad can hold a rider that has since been retired, and a retired
     // rider is off the registry listing, so the squad is merged back in to
     // keep the current nomination visible and editable.
-    for (const rider of country.squad) {
+    for (const rider of club.squad) {
       if (!byId.has(rider.riderId)) {
         byId.set(rider.riderId, { id: rider.riderId, fullName: rider.fullName });
       }
     }
-    for (const rider of extraRiders[country.countryId] ?? []) byId.set(rider.id, rider);
+    for (const rider of extraRiders[club.clubId] ?? []) byId.set(rider.id, rider);
     return [...byId.values()].sort((a, b) => a.fullName.localeCompare(b.fullName));
   }
 
-  function startEditing(country: ParticipantCountry) {
-    setEditing(country.championshipCountryId);
-    setEditSelection(selectionFromSquad(country.squad));
+  function startEditing(club: ParticipantClub) {
+    setEditing(club.championshipClubId);
+    setEditSelection(selectionFromSquad(club.squad));
   }
 
-  function saveSquad(country: ParticipantCountry) {
+  function saveSquad(club: ParticipantClub) {
     if (!isSquadSavable(editSelection) || pending) return;
     startTransition(async () => {
       const result = await replaceSquadAction({
         championshipId,
-        championshipCountryId: country.championshipCountryId,
-        squad: { countryId: country.countryId, riders: squadRiders(editSelection) },
+        championshipClubId: club.championshipClubId,
+        squad: { clubId: club.clubId, riders: squadRiders(editSelection) },
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -158,11 +155,11 @@ export function ParticipantsManager({
     });
   }
 
-  function remove(country: ParticipantCountry) {
+  function remove(club: ParticipantClub) {
     startTransition(async () => {
-      const result = await removeChampionshipCountryAction({
+      const result = await removeChampionshipClubAction({
         championshipId,
-        championshipCountryId: country.championshipCountryId,
+        championshipClubId: club.championshipClubId,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -174,13 +171,13 @@ export function ParticipantsManager({
     });
   }
 
-  function chooseCountryToAdd(countryId: string) {
-    setAddCountryId(countryId);
+  function chooseClubToAdd(clubId: string) {
+    setAddClubId(clubId);
     setAddSelection({});
     setAddRiders([]);
-    if (!countryId) return;
+    if (!clubId) return;
     setAddLoading(true);
-    void listCountryRidersAction(countryId).then((result) => {
+    void listClubRidersAction(clubId).then((result) => {
       setAddLoading(false);
       if (!result.ok) {
         toast.error(result.error);
@@ -190,19 +187,19 @@ export function ParticipantsManager({
     });
   }
 
-  function addCountry() {
-    if (!addCountryId || !isSquadSavable(addSelection) || pending) return;
+  function addClub() {
+    if (!addClubId || !isSquadSavable(addSelection) || pending) return;
     startTransition(async () => {
-      const result = await addChampionshipCountryAction({
+      const result = await addChampionshipClubAction({
         championshipId,
-        squad: { countryId: addCountryId, riders: squadRiders(addSelection) },
+        squad: { clubId: addClubId, riders: squadRiders(addSelection) },
       });
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
       setAddOpen(false);
-      setAddCountryId("");
+      setAddClubId("");
       setAddSelection({});
       setAddRiders([]);
       toast.success(t("championships.updatedSuccess"));
@@ -210,68 +207,63 @@ export function ParticipantsManager({
     });
   }
 
-  const addCountryName =
-    availableCountries.find((country) => country.id === addCountryId)?.name ?? "";
-  const addCountryIso2 =
-    availableCountries.find((country) => country.id === addCountryId)?.iso2 ?? "";
+  const addClubName =
+    availableClubs.find((club) => club.id === addClubId)?.name ?? "";
 
   return (
     <div className="space-y-4">
-      {canManageCountries ? (
+      {canManageClubs ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Badge tone="outline">
-            {t("championships.selectedCountries", { count: countries.length })}
+            {t("championships.selectedClubs", { count: clubs.length })}
           </Badge>
           <Button
             onClick={() => {
               setAddOpen(true);
-              chooseCountryToAdd("");
+              chooseClubToAdd("");
             }}
-            disabled={availableCountries.length === 0}
+            disabled={availableClubs.length === 0}
           >
             <Plus aria-hidden />
-            {`${t("common.add")} ${t("common.country")}`}
+            {`${t("common.add")} ${t("common.club")}`}
           </Button>
         </div>
       ) : null}
 
-      {canManageCountries && countries.length > 1 ? (
+      {canManageClubs && clubs.length > 1 ? (
         <Callout tone={championshipStarted ? "neutral" : "info"}>
           {championshipStarted
-            ? t("championships.countryOrderLocked")
-            : t("championships.countryOrderEditableHint")}
+            ? t("championships.clubOrderLocked")
+            : t("championships.clubOrderEditableHint")}
         </Callout>
       ) : null}
 
-      {countries.length === 0 ? (
+      {clubs.length === 0 ? (
         <EmptyState
-          icon={<Flag />}
-          title={t("championships.selectCountries")}
-          description={t("championships.selectCountriesHint")}
+          icon={<Shield />}
+          title={t("championships.selectClubs")}
+          description={t("championships.selectClubsHint")}
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {countries.map((country, index) => {
-            const isEditing = editing === country.championshipCountryId;
-            const active = [...country.squad]
+          {clubs.map((club, index) => {
+            const isEditing = editing === club.championshipClubId;
+            const active = [...club.squad]
               .filter((rider) => rider.rosterSlot === "ACTIVE")
               .sort((a, b) => (a.initialOrder ?? 0) - (b.initialOrder ?? 0));
-            const reserve = country.squad.find((rider) => rider.rosterSlot === "RESERVE");
-            const squadEmpty = country.squad.length === 0;
+            const reserve = club.squad.find((rider) => rider.rosterSlot === "RESERVE");
+            const squadEmpty = club.squad.length === 0;
 
             return (
-              <Card key={country.championshipCountryId}>
+              <Card key={club.championshipClubId}>
                 <CardHeader>
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <span className="numeric inline-flex size-5 shrink-0 items-center justify-center rounded-sm bg-surface-sunken text-xs font-semibold text-muted">
                       {index + 1}
                     </span>
-                    <CountryLabel
-                      iso2={country.iso2}
-                      name={country.name}
-                      size="md"
-                      className="min-w-0 flex-1 text-sm font-semibold"
-                    />
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                      {club.name}
+                    </span>
                   </span>
                   <div className="flex items-center gap-1">
                     {canReorder && !isEditing ? (
@@ -279,18 +271,18 @@ export function ParticipantsManager({
                         <Button
                           size="iconSm"
                           variant="ghost"
-                          onClick={() => moveCountry(index, -1)}
+                          onClick={() => moveClub(index, -1)}
                           disabled={index === 0 || reordering}
-                          aria-label={`${t("templates.moveUp")}: ${country.name}`}
+                          aria-label={`${t("templates.moveUp")}: ${club.name}`}
                         >
                           <ArrowUp aria-hidden />
                         </Button>
                         <Button
                           size="iconSm"
                           variant="ghost"
-                          onClick={() => moveCountry(index, 1)}
-                          disabled={index === countries.length - 1 || reordering}
-                          aria-label={`${t("templates.moveDown")}: ${country.name}`}
+                          onClick={() => moveClub(index, 1)}
+                          disabled={index === clubs.length - 1 || reordering}
+                          aria-label={`${t("templates.moveDown")}: ${club.name}`}
                         >
                           <ArrowDown aria-hidden />
                         </Button>
@@ -300,18 +292,18 @@ export function ParticipantsManager({
                       <Button
                         size="iconSm"
                         variant="ghost"
-                        onClick={() => startEditing(country)}
-                        aria-label={`${t("common.edit")}: ${country.name}`}
+                        onClick={() => startEditing(club)}
+                        aria-label={`${t("common.edit")}: ${club.name}`}
                       >
                         <Pencil aria-hidden />
                       </Button>
                     ) : null}
-                    {canManageCountries && !isEditing ? (
+                    {canManageClubs && !isEditing ? (
                       <Button
                         size="iconSm"
                         variant="ghost"
-                        onClick={() => setRemoveTarget(country)}
-                        aria-label={`${t("common.remove")}: ${country.name}`}
+                        onClick={() => setRemoveTarget(club)}
+                        aria-label={`${t("common.remove")}: ${club.name}`}
                       >
                         <Trash2 aria-hidden />
                       </Button>
@@ -323,17 +315,16 @@ export function ParticipantsManager({
                   {isEditing ? (
                     <div className="space-y-3">
                       <SquadPicker
-                        countryId={country.countryId}
-                        countryName={country.name}
-                        iso2={country.iso2}
-                        riders={ridersFor(country)}
+                        clubId={club.clubId}
+                        clubName={club.name}
+                        riders={ridersFor(club)}
                         value={editSelection}
                         onChange={setEditSelection}
                         onRiderAdded={(rider) =>
                           setExtraRiders((previous) => ({
                             ...previous,
-                            [country.countryId]: [
-                              ...(previous[country.countryId] ?? []),
+                            [club.clubId]: [
+                              ...(previous[club.clubId] ?? []),
                               rider,
                             ],
                           }))
@@ -343,7 +334,7 @@ export function ParticipantsManager({
                         <Button
                           loading={pending}
                           disabled={!isSquadSavable(editSelection)}
-                          onClick={() => saveSquad(country)}
+                          onClick={() => saveSquad(club)}
                         >
                           {t("common.save")}
                         </Button>
@@ -402,19 +393,19 @@ export function ParticipantsManager({
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{`${t("common.add")} ${t("common.country")}`}</DialogTitle>
+            <DialogTitle>{`${t("common.add")} ${t("common.club")}`}</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-3">
-            <Field label={t("common.country")} htmlFor="add-country" required>
+            <Field label={t("common.club")} htmlFor="add-club" required>
               <Select
-                id="add-country"
-                value={addCountryId}
-                onChange={(event) => chooseCountryToAdd(event.target.value)}
+                id="add-club"
+                value={addClubId}
+                onChange={(event) => chooseClubToAdd(event.target.value)}
               >
                 <option value="">-</option>
-                {availableCountries.map((country) => (
-                  <option key={country.id} value={country.id}>
-                    {country.name}
+                {availableClubs.map((club) => (
+                  <option key={club.id} value={club.id}>
+                    {club.name}
                   </option>
                 ))}
               </Select>
@@ -427,11 +418,10 @@ export function ParticipantsManager({
               </p>
             ) : null}
 
-            {addCountryId && !addLoading ? (
+            {addClubId && !addLoading ? (
               <SquadPicker
-                countryId={addCountryId}
-                countryName={addCountryName}
-                iso2={addCountryIso2}
+                clubId={addClubId}
+                clubName={addClubName}
                 riders={addRiders}
                 value={addSelection}
                 onChange={setAddSelection}
@@ -445,8 +435,8 @@ export function ParticipantsManager({
             </Button>
             <Button
               loading={pending}
-              disabled={!addCountryId || !isSquadSavable(addSelection)}
-              onClick={addCountry}
+              disabled={!addClubId || !isSquadSavable(addSelection)}
+              onClick={addClub}
             >
               {t("common.add")}
             </Button>

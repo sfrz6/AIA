@@ -40,18 +40,18 @@ suite("scoring, confirmation and correction", () => {
     const runIds = await listRunIds(fixture.championshipId);
     const runId = runIds[0]!;
 
-    const { getRunEntryOrderState, confirmCountryEntryOrder, startRun, getRunContext } =
+    const { getRunEntryOrderState, confirmClubEntryOrder, startRun, getRunContext } =
       await import("@/server/services/runs").then(async (runs) => ({
         ...runs,
         getRunContext: (await import("@/server/services/championships")).getRunContext,
       }));
 
     const state = await getRunEntryOrderState(runId, "en");
-    for (const country of state!.countries) {
+    for (const club of state!.clubs) {
       await db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: country.championshipCountryId,
+          championshipClubId: club.championshipClubId,
           decision: "NO_CHANGE",
         }),
       );
@@ -75,8 +75,8 @@ suite("scoring, confirmation and correction", () => {
     const units: RunScorePayload["units"][number][] = [];
     const scores: RunScorePayload["scores"][number][] = [];
 
-    for (const country of state!.countries) {
-      for (const unit of country.units) {
+    for (const club of state!.clubs) {
+      for (const unit of club.units) {
         units.push({ runScoringUnitId: unit.runScoringUnitId, timeSeconds });
         for (const rider of unit.riders) {
           scores.push({
@@ -99,7 +99,7 @@ suite("scoring, confirmation and correction", () => {
     const { saveRunScores, getRunScoringState } = await import("@/server/services/runs");
 
     const state = await getRunScoringState(runId, "en");
-    const firstUnit = state!.countries[0]!.units[0]!;
+    const firstUnit = state!.clubs[0]!.units[0]!;
 
     const partial = await db.transaction((tx) =>
       saveRunScores(tx, actor, {
@@ -167,7 +167,7 @@ suite("scoring, confirmation and correction", () => {
     // carried over automatically once Run 1 (opened above) was confirmed.
     const otherRunId = first.runIds[1]!;
     const otherScoring = await getRunScoringState(otherRunId, "en");
-    const foreignScoreId = otherScoring!.countries[0]!.units[0]!.riders[0]!.runScoreId;
+    const foreignScoreId = otherScoring!.clubs[0]!.units[0]!.riders[0]!.runScoreId;
 
     await expect(
       db.transaction(async (tx) =>
@@ -184,7 +184,7 @@ suite("scoring, confirmation and correction", () => {
     const { runId } = await openRun("INDIVIDUAL_LANCE");
     const { saveRunScores, getRunScoringState } = await import("@/server/services/runs");
     const state = await getRunScoringState(runId, "en");
-    const scoreId = state!.countries[0]!.units[0]!.riders[0]!.runScoreId;
+    const scoreId = state!.clubs[0]!.units[0]!.riders[0]!.runScoreId;
 
     await expect(
       db.transaction(async (tx) =>
@@ -201,7 +201,7 @@ suite("scoring, confirmation and correction", () => {
     const { runId } = await openRun("RINGS_AND_PEG_LANCE");
     const { saveRunScores, getRunScoringState } = await import("@/server/services/runs");
     const state = await getRunScoringState(runId, "en");
-    const scoreId = state!.countries[0]!.units[0]!.riders[0]!.runScoreId;
+    const scoreId = state!.clubs[0]!.units[0]!.riders[0]!.runScoreId;
 
     // A 4 on ring 2 (index 1) is rejected...
     await expect(
@@ -275,7 +275,7 @@ suite("scoring, confirmation and correction", () => {
     expect(standings.every((entry) => entry.rank === 1)).toBe(true);
   });
 
-  it("charges a team time fault to the country and not to the riders", async () => {
+  it("charges a team time fault to the club and not to the riders", async () => {
     const { runId, championshipId } = await openRun("TEAM_LANCE");
     const { saveRunScores, confirmRun } = await import("@/server/services/runs");
     const { loadChampionshipResults } = await import("@/server/services/results");
@@ -296,10 +296,10 @@ suite("scoring, confirmation and correction", () => {
     const rider = [...results.totals.riders.values()][0]!;
     expect(rider.overall.toString()).toBe("6");
 
-    const country = [...results.totals.countries.values()][0]!;
-    expect(country.riderPointsOverall.toString()).toBe("24");
-    expect(country.penaltiesOverall.toString()).toBe("-1");
-    expect(country.overall.toString()).toBe("23");
+    const club = [...results.totals.clubs.values()][0]!;
+    expect(club.riderPointsOverall.toString()).toBe("24");
+    expect(club.penaltiesOverall.toString()).toBe("-1");
+    expect(club.overall.toString()).toBe("23");
   });
 
   it("requires a reason to correct a confirmed run and records a revision", async () => {
@@ -384,16 +384,16 @@ suite("scoring, confirmation and correction", () => {
 
   it("still allows the entry order to change after the run has started, as long as no score has been saved", async () => {
     const { runId } = await openRun("INDIVIDUAL_LANCE");
-    const { confirmCountryEntryOrder, getRunEntryOrderState } = await import(
+    const { confirmClubEntryOrder, getRunEntryOrderState } = await import(
       "@/server/services/runs"
     );
     const state = await getRunEntryOrderState(runId, "en");
 
     await expect(
       db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: state!.countries[0]!.championshipCountryId,
+          championshipClubId: state!.clubs[0]!.championshipClubId,
           decision: "NO_CHANGE",
         }),
       ),
@@ -402,7 +402,7 @@ suite("scoring, confirmation and correction", () => {
 
   it("locks the entry order once a score has been saved for the run", async () => {
     const { runId } = await openRun("INDIVIDUAL_LANCE");
-    const { confirmCountryEntryOrder, getRunEntryOrderState, saveRunScores } = await import(
+    const { confirmClubEntryOrder, getRunEntryOrderState, saveRunScores } = await import(
       "@/server/services/runs"
     );
 
@@ -418,9 +418,9 @@ suite("scoring, confirmation and correction", () => {
 
     await expect(
       db.transaction((tx) =>
-        confirmCountryEntryOrder(tx, actor, {
+        confirmClubEntryOrder(tx, actor, {
           runId,
-          championshipCountryId: state!.countries[0]!.championshipCountryId,
+          championshipClubId: state!.clubs[0]!.championshipClubId,
           decision: "NO_CHANGE",
         }),
       ),

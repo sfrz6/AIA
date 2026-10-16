@@ -36,7 +36,7 @@ export function createDatabase(connectionString: string) {
 }
 
 declare global {
-  var __itpfDatabase: Database | undefined;
+  var __aiaDatabase: Database | undefined;
 }
 
 /**
@@ -47,7 +47,7 @@ declare global {
  * survive the module reloads the development server performs.
  */
 export function getDb(): Database {
-  if (globalThis.__itpfDatabase) return globalThis.__itpfDatabase;
+  if (globalThis.__aiaDatabase) return globalThis.__aiaDatabase;
 
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -57,6 +57,6 @@ export function getDb(): Database {
   }
 
   const database = createDatabase(connectionString);
-  globalThis.__itpfDatabase = database;
+  globalThis.__aiaDatabase = database;
   return database;
 }

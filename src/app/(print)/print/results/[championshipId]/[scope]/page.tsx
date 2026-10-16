@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requirePagePermission } from "@/lib/auth/page-guards";
 import { getTranslator } from "@/lib/i18n/server";
 import { championshipDisplayName, formatCompetitionDate } from "@/components/common/formatting";
-import { ItpfLogoPrint } from "@/components/common/itpf-logo";
+import { AiaLogoPrint, OmanFederationLogoPrint } from "@/components/common/aia-logo";
 import { PrintTrigger } from "@/components/common/print-trigger";
 import { getChampionshipDetail } from "@/server/services/championships";
 import { loadChampionshipResults } from "@/server/services/results";
@@ -48,7 +48,7 @@ export default async function InternalStandingsPdfPage({
   const results = await loadChampionshipResults(championshipId, locale);
   const { days, sets } = buildStandingsData(results, t);
   const individualSet = sets.find((set) => set.scope === scope && set.subject === "INDIVIDUAL")!;
-  const countrySet = sets.find((set) => set.scope === scope && set.subject === "COUNTRY")!;
+  const clubSet = sets.find((set) => set.scope === scope && set.subject === "CLUB")!;
 
   // The event score sheets only make sense for a single day's PDF: the
   // Overall PDF stays standings-only, since a run sheet is inherently a
@@ -69,7 +69,7 @@ export default async function InternalStandingsPdfPage({
 
       <header className="mb-4 flex items-start justify-between gap-6 border-b-2 border-black pb-3">
         <div className="flex items-start gap-4">
-          <ItpfLogoPrint width={96} />
+          <AiaLogoPrint width={96} />
           <div>
             <p className="text-[10pt] font-semibold uppercase tracking-wide">
               {t("common.federation")}
@@ -83,7 +83,8 @@ export default async function InternalStandingsPdfPage({
             </p>
           </div>
         </div>
-        <div className="text-end text-[9pt]">
+        <div className="flex flex-col items-end gap-1 text-end text-[9pt]">
+          <OmanFederationLogoPrint width={64} />
           <p className="text-[11pt] font-bold">
             {t("publicResults.standingsPdfTitle")} — {t(scopeLabelKey(scope))}
           </p>
@@ -93,9 +94,9 @@ export default async function InternalStandingsPdfPage({
 
       <section className="mb-4 space-y-2">
         <h2 className="text-[10pt] font-bold uppercase tracking-wide">
-          {t("publicResults.countryStandings")}
+          {t("publicResults.clubStandings")}
         </h2>
-        <StandingsPdfTable set={countrySet} days={days} t={t} />
+        <StandingsPdfTable set={clubSet} days={days} t={t} />
       </section>
 
       <section className="mb-4 space-y-2 print-avoid-break">

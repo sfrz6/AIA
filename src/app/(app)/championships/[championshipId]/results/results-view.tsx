@@ -56,7 +56,7 @@ export function ResultsView({
 
   const subjectOptions: readonly ToggleOption<StandingsSubject>[] = [
     { value: "INDIVIDUAL", label: t("results.individual") },
-    { value: "COUNTRY", label: t("results.countries") },
+    { value: "CLUB", label: t("results.clubs") },
   ];
   const scopeOptions: readonly ToggleOption<StandingsScope>[] = scopes.map((value) => ({
     value,

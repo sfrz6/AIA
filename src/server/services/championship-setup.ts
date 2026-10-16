@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Executor } from "@/db";
 import {
-  championshipCountries,
+  championshipClubs,
   championshipDays,
   championshipEvents,
   championshipRiders,
@@ -14,8 +14,8 @@ import {
   templateRuns,
 } from "@/db/schema";
 import {
-  ACTIVE_RIDERS_PER_COUNTRY,
-  RESERVE_RIDERS_PER_COUNTRY,
+  ACTIVE_RIDERS_PER_CLUB,
+  RESERVE_RIDERS_PER_CLUB,
   type EventTypeKey,
 } from "@/domain/scoring/event-types";
 import type { Principal } from "@/lib/auth/session";
@@ -23,10 +23,8 @@ import { DomainError } from "@/server/actions/result";
 import { recordAudit } from "./audit";
 import { listRunsInOrder } from "./championships";
 
-export const CHAMPIONSHIP_DAYS = 3;
-
 export interface SquadInput {
-  readonly countryId: string;
+  readonly clubId: string;
   readonly riders: ReadonlyArray<{
     readonly riderId: string;
     readonly rosterSlot: "ACTIVE" | "RESERVE";
@@ -84,7 +82,7 @@ export function addDays(isoDate: string, days: number): string {
 }
 
 /**
- * Validates one country's squad.
+ * Validates one club's squad.
  *
  * The competition model is four active riders plus one reserve. Active or
  * reserve belongs to the participation, not to the rider, so the same rider can
@@ -92,9 +90,9 @@ export function addDays(isoDate: string, days: number): string {
  *
  * A squad may also be left completely empty, meaning the riders have not been
  * decided yet. The entry order screen already refuses to prepare a run for a
- * country with an incomplete roster, so an empty squad is safe to store and
+ * club with an incomplete roster, so an empty squad is safe to store and
  * can be filled in later from the Participants page, any time before that
- * country takes part in a run. A squad that is neither empty nor complete is
+ * club takes part in a run. A squad that is neither empty nor complete is
  * rejected, because a half picked roster has no sensible meaning.
  */
 export function validateSquad(squad: SquadInput): void {
@@ -103,22 +101,22 @@ export function validateSquad(squad: SquadInput): void {
   const active = squad.riders.filter((rider) => rider.rosterSlot === "ACTIVE");
   const reserve = squad.riders.filter((rider) => rider.rosterSlot === "RESERVE");
 
-  if (active.length !== ACTIVE_RIDERS_PER_COUNTRY) {
+  if (active.length !== ACTIVE_RIDERS_PER_CLUB) {
     throw new DomainError(
-      `Each country needs exactly ${ACTIVE_RIDERS_PER_COUNTRY} active riders.`,
+      `Each club needs exactly ${ACTIVE_RIDERS_PER_CLUB} active riders.`,
       "VALIDATION",
     );
   }
-  if (reserve.length !== RESERVE_RIDERS_PER_COUNTRY) {
+  if (reserve.length !== RESERVE_RIDERS_PER_CLUB) {
     throw new DomainError(
-      `Each country needs exactly ${RESERVE_RIDERS_PER_COUNTRY} reserve rider.`,
+      `Each club needs exactly ${RESERVE_RIDERS_PER_CLUB} reserve rider.`,
       "VALIDATION",
     );
   }
 
   const orders = new Set<number>();
   for (const rider of active) {
-    if (rider.initialOrder === null || rider.initialOrder < 1 || rider.initialOrder > ACTIVE_RIDERS_PER_COUNTRY) {
+    if (rider.initialOrder === null || rider.initialOrder < 1 || rider.initialOrder > ACTIVE_RIDERS_PER_CLUB) {
       throw new DomainError("Each active rider needs a starting position.", "VALIDATION");
     }
     if (orders.has(rider.initialOrder)) {
@@ -138,19 +136,19 @@ export function validateSquad(squad: SquadInput): void {
   }
 }
 
-/** Confirms every nominated rider is registered under the country it is entered for. */
-async function assertRidersBelongToCountry(tx: Executor, squad: SquadInput): Promise<void> {
+/** Confirms every nominated rider is registered under the club it is entered for. */
+async function assertRidersBelongToClub(tx: Executor, squad: SquadInput): Promise<void> {
   const riderIds = squad.riders.map((rider) => rider.riderId);
   if (riderIds.length === 0) return;
 
   const rows = await tx
     .select({ id: riders.id })
     .from(riders)
-    .where(and(inArray(riders.id, riderIds), eq(riders.countryId, squad.countryId)));
+    .where(and(inArray(riders.id, riderIds), eq(riders.clubId, squad.clubId)));
 
   if (rows.length !== riderIds.length) {
     throw new DomainError(
-      "A selected rider is not registered under this country.",
+      "A selected rider is not registered under this club.",
       "VALIDATION",
     );
   }
@@ -271,17 +269,17 @@ export async function createChampionshipFromTemplate(
   input: CreateChampionshipInput,
 ): Promise<{ id: string; slug: string }> {
   if (input.squads.length < 2) {
-    throw new DomainError("Select at least two participating countries.", "VALIDATION");
+    throw new DomainError("Select at least two participating clubs.", "VALIDATION");
   }
 
-  const countryIds = new Set(input.squads.map((squad) => squad.countryId));
-  if (countryIds.size !== input.squads.length) {
-    throw new DomainError("A country is selected twice.", "VALIDATION");
+  const clubIds = new Set(input.squads.map((squad) => squad.clubId));
+  if (clubIds.size !== input.squads.length) {
+    throw new DomainError("A club is selected twice.", "VALIDATION");
   }
 
   for (const squad of input.squads) {
     validateSquad(squad);
-    await assertRidersBelongToCountry(tx, squad);
+    await assertRidersBelongToClub(tx, squad);
   }
 
   const structure = await readTemplateStructure(tx, input.templateId);
@@ -306,7 +304,16 @@ export async function createChampionshipFromTemplate(
 
   if (!championship) throw new DomainError("The championship could not be created.", "UNEXPECTED");
 
-  for (let dayNumber = 1; dayNumber <= CHAMPIONSHIP_DAYS; dayNumber += 1) {
+  // One championship day per template day that actually holds an event, not
+  // a fixed count: a template built for a single-day event must produce a
+  // single-day championship, not three days with two left empty. Days are
+  // renumbered contiguously from 1 in template order, so a template with
+  // events on days 1 and 3 but not 2 still yields a clean two-day
+  // championship rather than a gap.
+  const activeTemplateDays = structure.days.filter((day) => day.events.length > 0);
+
+  for (const [index, templateDay] of activeTemplateDays.entries()) {
+    const dayNumber = index + 1;
     const [day] = await tx
       .insert(championshipDays)
       .values({
@@ -316,9 +323,6 @@ export async function createChampionshipFromTemplate(
       })
       .returning({ id: championshipDays.id });
     if (!day) throw new DomainError("The championship could not be created.", "UNEXPECTED");
-
-    const templateDay = structure.days.find((entry) => entry.dayNumber === dayNumber);
-    if (!templateDay) continue;
 
     for (const event of templateDay.events) {
       const [created] = await tx
@@ -345,15 +349,15 @@ export async function createChampionshipFromTemplate(
 
   for (const [index, squad] of input.squads.entries()) {
     const [participant] = await tx
-      .insert(championshipCountries)
-      .values({ championshipId: championship.id, countryId: squad.countryId, orderIndex: index })
-      .returning({ id: championshipCountries.id });
+      .insert(championshipClubs)
+      .values({ championshipId: championship.id, clubId: squad.clubId, orderIndex: index })
+      .returning({ id: championshipClubs.id });
     if (!participant) throw new DomainError("The championship could not be created.", "UNEXPECTED");
 
     if (squad.riders.length > 0) {
       await tx.insert(championshipRiders).values(
         squad.riders.map((rider) => ({
-          championshipCountryId: participant.id,
+          championshipClubId: participant.id,
           riderId: rider.riderId,
           rosterSlot: rider.rosterSlot,
           initialOrder: rider.initialOrder,
@@ -373,7 +377,7 @@ export async function createChampionshipFromTemplate(
       location: input.location,
       organizer: input.organizer,
       template: structure.name,
-      countries: input.squads.length,
+      clubs: input.squads.length,
     },
   });
 
@@ -381,18 +385,18 @@ export async function createChampionshipFromTemplate(
 }
 
 /**
- * Replaces one country's squad.
+ * Replaces one club's squad.
  *
- * Refused once the country has ridden, because its entry orders and scores
+ * Refused once the club has ridden, because its entry orders and scores
  * reference the participation rows that would be removed.
  */
 export async function replaceSquad(
   tx: Executor,
   actor: Principal,
-  input: { championshipId: string; championshipCountryId: string; squad: SquadInput },
+  input: { championshipId: string; championshipClubId: string; squad: SquadInput },
 ): Promise<void> {
   validateSquad(input.squad);
-  await assertRidersBelongToCountry(tx, input.squad);
+  await assertRidersBelongToClub(tx, input.squad);
 
   // The correlation is written literally: an interpolated column would render
   // as a bare name and bind to run_scores inside the subquery.
@@ -401,7 +405,7 @@ export async function replaceSquad(
     .from(championshipRiders)
     .where(
       and(
-        eq(championshipRiders.championshipCountryId, input.championshipCountryId),
+        eq(championshipRiders.championshipClubId, input.championshipClubId),
         sql`exists (
           select 1 from run_scores rs
           where rs.championship_rider_id = championship_riders.id
@@ -411,7 +415,7 @@ export async function replaceSquad(
 
   if ((used?.count ?? 0) > 0) {
     throw new DomainError(
-      "This country has already taken part in a run, so its squad can no longer be replaced.",
+      "This club has already taken part in a run, so its squad can no longer be replaced.",
       "CONFLICT",
     );
   }
@@ -423,16 +427,16 @@ export async function replaceSquad(
       initialOrder: championshipRiders.initialOrder,
     })
     .from(championshipRiders)
-    .where(eq(championshipRiders.championshipCountryId, input.championshipCountryId));
+    .where(eq(championshipRiders.championshipClubId, input.championshipClubId));
 
   await tx
     .delete(championshipRiders)
-    .where(eq(championshipRiders.championshipCountryId, input.championshipCountryId));
+    .where(eq(championshipRiders.championshipClubId, input.championshipClubId));
 
   if (input.squad.riders.length > 0) {
     await tx.insert(championshipRiders).values(
       input.squad.riders.map((rider) => ({
-        championshipCountryId: input.championshipCountryId,
+        championshipClubId: input.championshipClubId,
         riderId: rider.riderId,
         rosterSlot: rider.rosterSlot,
         initialOrder: rider.initialOrder,
@@ -442,8 +446,8 @@ export async function replaceSquad(
 
   await recordAudit(tx, actor, {
     action: "CHAMPIONSHIP_SQUAD_UPDATED",
-    entityType: "championship_country",
-    entityId: input.championshipCountryId,
+    entityType: "championship_club",
+    entityId: input.championshipClubId,
     championshipId: input.championshipId,
     before: { riders: before },
     after: { riders: input.squad.riders },
@@ -452,15 +456,15 @@ export async function replaceSquad(
 
 /**
  * Permanently deletes a championship and every record that belongs to it:
- * days, events, runs, scores, entry orders, tie-break rounds, countries and
+ * days, events, runs, scores, entry orders, tie-break rounds, clubs and
  * rosters.
  *
  * Runs are deleted first, scoped through the event/day join, which cascades
- * away `run_scores` and `run_entry_order_items` before countries and riders
+ * away `run_scores` and `run_entry_order_items` before clubs and riders
  * are removed — those two tables are the only ones that `restrict` deleting
- * a rider who has already ridden (see `removeChampionshipCountry`'s guard),
+ * a rider who has already ridden (see `removeChampionshipClub`'s guard),
  * so clearing them first means that guard never fires here. Everything else
- * cascades from `championship_countries` or `championships` itself.
+ * cascades from `championship_clubs` or `championships` itself.
  */
 export async function deleteChampionship(
   tx: Executor,
@@ -490,8 +494,8 @@ export async function deleteChampionship(
   }
 
   await tx
-    .delete(championshipCountries)
-    .where(eq(championshipCountries.championshipId, championshipId));
+    .delete(championshipClubs)
+    .where(eq(championshipClubs.championshipId, championshipId));
 
   await tx.delete(championships).where(eq(championships.id, championshipId));
 
@@ -507,7 +511,7 @@ export async function deleteChampionship(
 /**
  * True once the championship's first run has actually started.
  *
- * The country start list is a property of the whole competition, so it stays
+ * The club start list is a property of the whole competition, so it stays
  * editable while every run is still in its preparation stages (entry orders
  * pending or ready) and locks the moment the very first run moves to in
  * progress, review or confirmed.
@@ -520,7 +524,7 @@ export async function hasChampionshipStarted(championshipId: string): Promise<bo
 }
 
 /**
- * Reorders the countries of a championship, as a start list position (team 1,
+ * Reorders the clubs of a championship, as a start list position (team 1,
  * team 2, ...). Refused once the championship has started, because rearranging
  * the start list after the competition is under way would be misleading.
  *
@@ -530,32 +534,32 @@ export async function hasChampionshipStarted(championshipId: string): Promise<bo
  * transaction, so writing the final values directly could collide with a row
  * that has not moved yet.
  */
-export async function reorderChampionshipCountries(
+export async function reorderChampionshipClubs(
   tx: Executor,
   actor: Principal,
-  input: { championshipId: string; orderedChampionshipCountryIds: readonly string[] },
+  input: { championshipId: string; orderedChampionshipClubIds: readonly string[] },
 ): Promise<void> {
   const existing = await tx
-    .select({ id: championshipCountries.id, orderIndex: championshipCountries.orderIndex })
-    .from(championshipCountries)
-    .where(eq(championshipCountries.championshipId, input.championshipId));
+    .select({ id: championshipClubs.id, orderIndex: championshipClubs.orderIndex })
+    .from(championshipClubs)
+    .where(eq(championshipClubs.championshipId, input.championshipId));
 
   const existingIds = new Set(existing.map((row) => row.id));
-  const requestedIds = input.orderedChampionshipCountryIds;
+  const requestedIds = input.orderedChampionshipClubIds;
   if (
     requestedIds.length !== existingIds.size ||
     new Set(requestedIds).size !== requestedIds.length ||
     !requestedIds.every((id) => existingIds.has(id))
   ) {
     throw new DomainError(
-      "The list of countries does not match this championship.",
+      "The list of clubs does not match this championship.",
       "VALIDATION",
     );
   }
 
   if (await hasChampionshipStarted(input.championshipId)) {
     throw new DomainError(
-      "The competition has already started, so the country order can no longer be changed.",
+      "The competition has already started, so the club order can no longer be changed.",
       "CONFLICT",
     );
   }
@@ -567,16 +571,16 @@ export async function reorderChampionshipCountries(
 
   for (const [index, id] of requestedIds.entries()) {
     await tx
-      .update(championshipCountries)
+      .update(championshipClubs)
       .set({ orderIndex: -(index + 1) })
-      .where(eq(championshipCountries.id, id));
+      .where(eq(championshipClubs.id, id));
   }
   for (const [index, id] of requestedIds.entries()) {
-    await tx.update(championshipCountries).set({ orderIndex: index }).where(eq(championshipCountries.id, id));
+    await tx.update(championshipClubs).set({ orderIndex: index }).where(eq(championshipClubs.id, id));
   }
 
   await recordAudit(tx, actor, {
-    action: "CHAMPIONSHIP_COUNTRIES_REORDERED",
+    action: "CHAMPIONSHIP_CLUBS_REORDERED",
     entityType: "championship",
     entityId: input.championshipId,
     championshipId: input.championshipId,
