@@ -50,10 +50,15 @@ export function countReserve(value: SquadSelection): number {
   return entriesOf(value).filter(([, slot]) => slot === RESERVE_SLOT).length;
 }
 
+/**
+ * A squad is complete once its four active riders are set. The reserve is
+ * for substitution only and is optional: a club may legitimately compete
+ * with just its four active riders and no one to sub in.
+ */
 export function isSquadComplete(value: SquadSelection): boolean {
   return (
     countActive(value) === ACTIVE_RIDERS_PER_CLUB &&
-    countReserve(value) === RESERVE_RIDERS_PER_CLUB
+    countReserve(value) <= RESERVE_RIDERS_PER_CLUB
   );
 }
 
@@ -63,9 +68,10 @@ export function isSquadEmpty(value: SquadSelection): boolean {
 }
 
 /**
- * Whether a squad may be saved as it stands: the full four active riders plus
- * one reserve, or nothing at all. A squad picked halfway cannot be saved,
- * because it has no sensible meaning for the entry order screen.
+ * Whether a squad may be saved as it stands: the full four active riders
+ * (with or without a reserve), or nothing at all. A squad picked halfway
+ * cannot be saved, because it has no sensible meaning for the entry order
+ * screen.
  */
 export function isSquadSavable(value: SquadSelection): boolean {
   return isSquadComplete(value) || isSquadEmpty(value);
@@ -76,16 +82,14 @@ export function isSquadSavable(value: SquadSelection): boolean {
  *
  * Empty once the squad is complete, and also empty while nothing has been
  * picked yet, because an empty squad is a deliberate choice to decide the
- * riders later, not a mistake to flag.
+ * riders later, not a mistake to flag. The reserve is optional, so having
+ * none is never an issue.
  */
 export function squadIssues(value: SquadSelection, t: Translator): readonly string[] {
   if (isSquadEmpty(value)) return [];
   const issues: string[] = [];
   if (countActive(value) !== ACTIVE_RIDERS_PER_CLUB) {
     issues.push(t("championships.needFourActive"));
-  }
-  if (countReserve(value) !== RESERVE_RIDERS_PER_CLUB) {
-    issues.push(t("championships.needOneReserve"));
   }
   return issues;
 }
@@ -230,7 +234,8 @@ export function SquadPicker({
           {t("championships.activeRiders")} {countActive(value)}/{ACTIVE_RIDERS_PER_CLUB}
         </Badge>
         <Badge tone={countReserve(value) === RESERVE_RIDERS_PER_CLUB ? "success" : "outline"}>
-          {t("championships.reserveRider")} {countReserve(value)}/{RESERVE_RIDERS_PER_CLUB}
+          {t("championships.reserveRider")} {countReserve(value)}/{RESERVE_RIDERS_PER_CLUB} (
+          {t("common.optional")})
         </Badge>
       </div>
 

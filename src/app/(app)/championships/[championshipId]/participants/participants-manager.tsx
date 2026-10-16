@@ -379,7 +379,7 @@ export function ParticipantsManager({
                           {reserve.fullName}
                         </p>
                       ) : (
-                        <p className="text-sm text-muted">{t("championships.needOneReserve")}</p>
+                        <p className="text-sm text-muted">{t("championships.noReserveNominated")}</p>
                       )}
                     </div>
                   )}

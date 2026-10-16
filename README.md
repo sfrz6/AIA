@@ -89,8 +89,8 @@ src/
 - **Authorization is server side.** Hiding a button is a convenience. Every
   protected action re-checks the capability after validating its input.
 - **A squad is either complete or empty, never half picked.** A club can be
-  added to a championship with its four active riders and one reserve decided
-  on the spot, or with none at all, to be filled in later from the
+  added to a championship with its four active riders decided on the spot
+  (a reserve is optional), or with none at all, to be filled in later from the
   Participants page. Either state is valid; anything in between is refused,
   because it has no sensible meaning for the entry order screen.
 - **The club start list order is editable until the competition actually

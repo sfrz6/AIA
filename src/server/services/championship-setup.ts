@@ -86,16 +86,19 @@ export function addDays(isoDate: string, days: number): string {
 /**
  * Validates one club's squad.
  *
- * The competition model is four active riders plus one reserve. Active or
- * reserve belongs to the participation, not to the rider, so the same rider can
- * be active here and reserve in the next championship.
+ * The competition model is four active riders plus an optional reserve for
+ * substitution. Active or reserve belongs to the participation, not to the
+ * rider, so the same rider can be active here and reserve in the next
+ * championship.
  *
  * A squad may also be left completely empty, meaning the riders have not been
  * decided yet. The entry order screen already refuses to prepare a run for a
  * club with an incomplete roster, so an empty squad is safe to store and
  * can be filled in later from the Participants page, any time before that
- * club takes part in a run. A squad that is neither empty nor complete is
- * rejected, because a half picked roster has no sensible meaning.
+ * club takes part in a run. A squad with its four active riders decided is
+ * savable whether or not a reserve was picked; anything else (missing an
+ * active rider, or more than one reserve) is rejected, because a half picked
+ * roster has no sensible meaning.
  */
 export function validateSquad(squad: SquadInput): void {
   if (squad.riders.length === 0) return;
@@ -109,9 +112,9 @@ export function validateSquad(squad: SquadInput): void {
       "VALIDATION",
     );
   }
-  if (reserve.length !== RESERVE_RIDERS_PER_CLUB) {
+  if (reserve.length > RESERVE_RIDERS_PER_CLUB) {
     throw new DomainError(
-      `Each club needs exactly ${RESERVE_RIDERS_PER_CLUB} reserve rider.`,
+      `Each club may have at most ${RESERVE_RIDERS_PER_CLUB} reserve rider.`,
       "VALIDATION",
     );
   }
