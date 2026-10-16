@@ -1,0 +1,363 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * ITPF visual identity.
+ *
+ * The palette is derived from the supplied federation logo: the teal of the
+ * horse mark (#00718F) and the gold of the lance and wordmark (#8D744A), over a
+ * cool near-navy neutral ramp. This is operational software used at a
+ * competition ground, so the design favours contrast, density and calm over
+ * decoration.
+ */
+@theme {
+  --color-brand-50: #ecf7fa;
+  --color-brand-100: #d0ecf3;
+  --color-brand-200: #a3d9e8;
+  --color-brand-300: #6cc0d7;
+  --color-brand-400: #33a1bf;
+  --color-brand-500: #0a82a4;
+  --color-brand-600: #00718f;
+  --color-brand-700: #015b74;
+  --color-brand-800: #084a5e;
+  --color-brand-900: #0c3d4e;
+  --color-brand-950: #052733;
+
+  --color-gold-50: #faf7f1;
+  --color-gold-100: #f2ead9;
+  --color-gold-200: #e4d4b6;
+  --color-gold-300: #d2b98b;
+  --color-gold-400: #be9d64;
+  --color-gold-500: #a98549;
+  --color-gold-600: #8d744a;
+  --color-gold-700: #75603d;
+  --color-gold-800: #5e4d34;
+  --color-gold-900: #4d402e;
+  --color-gold-950: #2b2216;
+
+  --color-ink-50: #f6f8f9;
+  --color-ink-100: #ecf0f2;
+  --color-ink-200: #d6dee3;
+  --color-ink-300: #b3c1c9;
+  --color-ink-400: #8499a5;
+  --color-ink-500: #637c8a;
+  --color-ink-600: #4d6472;
+  --color-ink-700: #40525d;
+  --color-ink-800: #2b3942;
+  --color-ink-900: #0e1a21;
+  --color-ink-950: #060d12;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Arabic",
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", monospace;
+
+  --radius-sm: 0.1875rem;
+  --radius-md: 0.3125rem;
+  --radius-lg: 0.5rem;
+}
+
+/* Semantic tokens. Components reference these, never the raw ramps. */
+@layer base {
+  :root {
+    --background: var(--color-white);
+    --surface: var(--color-ink-50);
+    --surface-raised: var(--color-white);
+    --surface-sunken: var(--color-ink-100);
+    --foreground: var(--color-ink-900);
+    --muted-foreground: var(--color-ink-600);
+    --subtle-foreground: var(--color-ink-500);
+    --border: var(--color-ink-200);
+    --border-strong: var(--color-ink-300);
+    --primary: var(--color-brand-600);
+    --primary-hover: var(--color-brand-700);
+    --primary-foreground: var(--color-white);
+    --primary-subtle: var(--color-brand-50);
+    --accent: var(--color-gold-600);
+    --accent-foreground: var(--color-white);
+    --accent-subtle: var(--color-gold-50);
+    --danger: #b42318;
+    --danger-foreground: var(--color-white);
+    --danger-subtle: #fef3f2;
+    --success: #0b7a4b;
+    --success-subtle: #ecfdf3;
+    --warning: #a1660a;
+    --warning-subtle: #fffaeb;
+    --ring: var(--color-brand-500);
+    --shell: var(--color-ink-900);
+    --shell-foreground: var(--color-ink-100);
+    --shell-muted: var(--color-ink-400);
+    --shell-border: #1d2a32;
+    --shell-active: #142129;
+    color-scheme: light;
+  }
+
+  .dark {
+    --background: var(--color-ink-950);
+    --surface: #0a141a;
+    --surface-raised: #0f1b22;
+    --surface-sunken: #081117;
+    --foreground: #e6edf1;
+    --muted-foreground: var(--color-ink-400);
+    --subtle-foreground: var(--color-ink-500);
+    --border: #1d2a32;
+    --border-strong: #2b3942;
+    --primary: var(--color-brand-400);
+    --primary-hover: var(--color-brand-300);
+    --primary-foreground: #04161d;
+    --primary-subtle: #0a2630;
+    --accent: var(--color-gold-300);
+    --accent-foreground: #221b0e;
+    --accent-subtle: #241e13;
+    --danger: #f97066;
+    --danger-foreground: #2a0a07;
+    --danger-subtle: #2a1210;
+    --success: #47cd89;
+    --success-subtle: #0d2219;
+    --warning: #fdb022;
+    --warning-subtle: #2a1f08;
+    --ring: var(--color-brand-400);
+    --shell: #03090d;
+    --shell-foreground: var(--color-ink-100);
+    --shell-muted: var(--color-ink-500);
+    --shell-border: #16222a;
+    --shell-active: #0c161c;
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05", "tnum";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Tabular figures everywhere a score, time or rank is shown. */
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Keep number inputs clean: the spinner is useless under competition speed. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+ * Semantic tokens are exposed to Tailwind as colour utilities, so components
+ * write `bg-surface-raised` or `text-muted` rather than repeating raw values.
+ * Because each one points at a live custom property, the same utility resolves
+ * correctly in light mode, dark mode and print.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted-foreground);
+  --color-subtle: var(--subtle-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-subtle: var(--primary-subtle);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-ring: var(--ring);
+  --color-shell: var(--shell);
+  --color-shell-foreground: var(--shell-foreground);
+  --color-shell-muted: var(--shell-muted);
+  --color-shell-border: var(--shell-border);
+  --color-shell-active: var(--shell-active);
+}
+
+@layer utilities {
+  /* Hairline rule used between dense table rows. */
+  .divide-hairline > * + * {
+    border-top-width: 1px;
+    border-top-style: solid;
+    border-color: var(--border);
+  }
+
+  /*
+   * Edge shadows for a horizontally scrolling container, in the direction the
+   * reader's own locale scrolls. A table wide enough to scroll gives no other
+   * sign of it on a touchscreen, where there is no visible scrollbar track to
+   * notice; this paints a soft shadow over whichever edge still has more
+   * content, and the browser removes it on its own once that edge is reached,
+   * because the shadow layers scroll with the content while the covering
+   * layers that hide them stay fixed to the viewport. Written as two literal,
+   * direction specific rules rather than one with a custom property inside the
+   * gradient keyword, which some engines resolve inconsistently.
+   */
+  .scroll-shadow-x {
+    background-repeat: no-repeat;
+    background-size: 24px 100%, 24px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
+    background-image:
+      linear-gradient(to right, var(--surface-raised) 40%, transparent),
+      linear-gradient(to left, var(--surface-raised) 40%, transparent),
+      linear-gradient(to right, rgba(0, 0, 0, 0.18), transparent 18px),
+      linear-gradient(to left, rgba(0, 0, 0, 0.18), transparent 18px);
+    background-position: left top, right top, left top, right top;
+  }
+
+  /* Mirrored for Arabic, matching Tailwind's own `[dir="rtl"]` convention. */
+  [dir="rtl"] .scroll-shadow-x {
+    background-image:
+      linear-gradient(to left, var(--surface-raised) 40%, transparent),
+      linear-gradient(to right, var(--surface-raised) 40%, transparent),
+      linear-gradient(to left, rgba(0, 0, 0, 0.18), transparent 18px),
+      linear-gradient(to right, rgba(0, 0, 0, 0.18), transparent 18px);
+    background-position: right top, left top, right top, left top;
+  }
+
+  /*
+   * The equivalent shadow for a table with sticky edge columns (the
+   * standings table): those columns sit on top of `scroll-shadow-x`'s own
+   * background and would hide it, so the shadow is painted on the sticky
+   * cells themselves instead, driven by `useHorizontalScrollEdges` toggling
+   * the `data-can-scroll-*` attribute on the scrolling wrapper.
+   */
+  [data-can-scroll-start] .standings-sticky-name {
+    box-shadow: 8px 0 8px -6px rgba(0, 0, 0, 0.25);
+  }
+  [data-can-scroll-end] .standings-sticky-end {
+    box-shadow: -8px 0 8px -6px rgba(0, 0, 0, 0.25);
+  }
+  [dir="rtl"] [data-can-scroll-start] .standings-sticky-name {
+    box-shadow: -8px 0 8px -6px rgba(0, 0, 0, 0.25);
+  }
+  [dir="rtl"] [data-can-scroll-end] .standings-sticky-end {
+    box-shadow: 8px 0 8px -6px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/*
+ * Print.
+ *
+ * Round sheets are official competition documents handed to the manual referee.
+ * They target A4, use black on white regardless of the screen theme, and hide
+ * every piece of application chrome.
+ */
+@page {
+  size: A4 portrait;
+  margin: 12mm 10mm;
+}
+
+@media print {
+  :root,
+  .dark {
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-sunken: #ffffff;
+    --foreground: #000000;
+    --muted-foreground: #333333;
+    --subtle-foreground: #444444;
+    --border: #000000;
+    --border-strong: #000000;
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10pt;
+  }
+
+  .print-hidden,
+  nav[data-app-nav],
+  header[data-app-header],
+  aside[data-app-sidebar],
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+
+  .print-only {
+    display: revert !important;
+  }
+
+  .print-sheet {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .print-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  table {
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  td,
+  th {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+}
+
+.print-only {
+  display: none;
+}

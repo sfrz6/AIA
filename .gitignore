@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+build
+dist
+coverage
+.env
+.env.local
+.env*.local
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+next-env.d.ts
+playwright-report
+test-results
+.vercel
+.DS_Store
+~$*
