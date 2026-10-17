@@ -5,6 +5,8 @@ import { requirePagePermission } from "@/lib/auth/page-guards";
 import { getTranslator } from "@/lib/i18n/server";
 import { getClub, listRidersForClub } from "@/server/services/registry";
 import { PageHeader } from "@/components/ui/surfaces";
+import { localizedText } from "@/components/common/formatting";
+import { ClubSettings } from "./club-settings";
 import { RiderRegistry } from "./rider-registry";
 
 export default async function ClubPage({
@@ -19,7 +21,7 @@ export default async function ClubPage({
   const { clubId } = await params;
   const { retired } = await searchParams;
 
-  const club = await getClub(clubId, locale);
+  const club = await getClub(clubId);
   if (!club) notFound();
 
   const includeRetired = retired === "1";
@@ -37,8 +39,9 @@ export default async function ClubPage({
             {t("clubs.title")}
           </Link>
         }
-        title={club.name}
+        title={localizedText(club.name, club.nameAr, locale)}
         description={t("clubs.subtitle")}
+        actions={<ClubSettings club={club} />}
       />
 
       <RiderRegistry

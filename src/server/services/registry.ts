@@ -58,16 +58,13 @@ export async function listClubsWithRiderCounts(
   return rows;
 }
 
+/** The club's raw name and Arabic override, as entered, for display and editing. */
 export async function getClub(
   clubId: string,
-  locale: Locale,
-): Promise<{ id: string; name: string } | null> {
+): Promise<{ id: string; name: string; nameAr: string | null } | null> {
   const db = getDb();
   const [row] = await db
-    .select({
-      id: clubs.id,
-      name: nameColumn(locale),
-    })
+    .select({ id: clubs.id, name: clubs.name, nameAr: clubs.nameAr })
     .from(clubs)
     .where(eq(clubs.id, clubId))
     .limit(1);
@@ -101,6 +98,104 @@ export async function createClub(
   throw new DomainError("A club with this name already exists.", "CONFLICT", {
     name: "A club with this name already exists.",
   });
+}
+
+/**
+ * Renames a club, and/or changes its Arabic override. The unique index on
+ * the folded name is what actually prevents a collision with another club's
+ * name, so a race between two operators is caught by the database rather
+ * than by a read-then-write check.
+ */
+export async function updateClub(
+  tx: Executor,
+  input: { clubId: string; name: string; nameAr: string | null },
+): Promise<{ id: string; name: string }> {
+  const name = input.name.trim().replace(/\s+/g, " ");
+  if (!name) throw new DomainError("A club name is required.", "VALIDATION");
+  const nameAr = input.nameAr?.trim().replace(/\s+/g, " ") || null;
+
+  const [existing] = await tx
+    .select({ id: clubs.id })
+    .from(clubs)
+    .where(eq(clubs.id, input.clubId))
+    .limit(1);
+  if (!existing) throw new DomainError("Club not found.", "NOT_FOUND");
+
+  const [clash] = await tx
+    .select({ id: clubs.id })
+    .from(clubs)
+    .where(
+      and(
+        sql`lower(btrim(${clubs.name})) = lower(btrim(${name}))`,
+        sql`${clubs.id} <> ${input.clubId}`,
+      ),
+    )
+    .limit(1);
+  if (clash) {
+    throw new DomainError("A club with this name already exists.", "CONFLICT", {
+      name: "A club with this name already exists.",
+    });
+  }
+
+  await tx
+    .update(clubs)
+    .set({ name, nameAr, updatedAt: new Date() })
+    .where(eq(clubs.id, input.clubId));
+
+  return { id: input.clubId, name };
+}
+
+/**
+ * How many riders are on a club's registry and how many championships it has
+ * taken part in, which together decide whether it may be deleted outright.
+ */
+export async function countClubUsage(
+  tx: Executor,
+  clubId: string,
+): Promise<{ riders: number; championships: number }> {
+  const [row] = await tx
+    .select({
+      riders: sql<number>`(select count(*)::int from riders where club_id = ${clubId})`,
+      championships: sql<number>`(
+        select count(*)::int from championship_clubs where club_id = ${clubId}
+      )`,
+    })
+    .from(clubs)
+    .where(eq(clubs.id, clubId))
+    .limit(1);
+  return row ?? { riders: 0, championships: 0 };
+}
+
+/**
+ * Deletes a club outright. Refused once it has a rider on its registry or has
+ * taken part in a championship, in which case the club is permanent history
+ * and must stay, the same reasoning that keeps a rider on record after being
+ * retired rather than deleted.
+ */
+export async function deleteClub(tx: Executor, clubId: string): Promise<{ name: string }> {
+  const [existing] = await tx
+    .select({ id: clubs.id, name: clubs.name })
+    .from(clubs)
+    .where(eq(clubs.id, clubId))
+    .limit(1);
+  if (!existing) throw new DomainError("Club not found.", "NOT_FOUND");
+
+  const usage = await countClubUsage(tx, clubId);
+  if (usage.riders > 0) {
+    throw new DomainError(
+      "This club has riders on its registry and cannot be deleted. Retire its riders first, or keep the club.",
+      "CONFLICT",
+    );
+  }
+  if (usage.championships > 0) {
+    throw new DomainError(
+      "This club has taken part in a championship and cannot be deleted.",
+      "CONFLICT",
+    );
+  }
+
+  await tx.delete(clubs).where(eq(clubs.id, clubId));
+  return { name: existing.name };
 }
 
 export async function listRidersForClub(
